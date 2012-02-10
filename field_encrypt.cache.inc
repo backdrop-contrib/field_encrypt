@@ -25,7 +25,6 @@ class FieldEncryptDatabaseCache extends DrupalDatabaseCache {
    */
   protected function prepareItem($cache) {
     global $user;
-
     if (!isset($cache->data)) {
       return FALSE;
     }

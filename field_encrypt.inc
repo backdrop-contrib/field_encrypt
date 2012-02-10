@@ -27,7 +27,9 @@ function field_encrypt_do_encrypt($field_info, $phrase) {
       $insert[$field] = $result->$field;
       unset($result->$field);
     }
-    $insert['value'] = field_encrypt_encrypt(serialize($result), $field_info['settings']['field_encrypt']['phrase']); // encrypt here
+    if (isset($field_info['settings']['field_encrypt'])) {
+      $insert['value'] = field_encrypt_encrypt(serialize($result), $field_info['settings']['field_encrypt']['phrase']); // encrypt here
+    }
     $inserts[] = $insert;
   }
 
