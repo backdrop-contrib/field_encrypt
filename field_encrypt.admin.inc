@@ -10,6 +10,8 @@
  * Alter the field settings form.
  */
 function _field_encrypt_field_settings_form_alter(&$form, &$form_state, $form_id) {
+
+
   // Obtain the field name from form (should really be $form_state,
   // but the Date field doesn't comply).
   $field_name = $form['#field']['field_name'];
@@ -19,12 +21,19 @@ function _field_encrypt_field_settings_form_alter(&$form, &$form_state, $form_id
   $field_type_info = field_info_field_types($field_info['type']);
 
   // If this field type cannot be encrypted, exit here
-#  if ($field_type_info['property_type']!='text') {
-#    return;
-#  }
+  #  if ($field_type_info['property_type']!='text') {
+  #    return;
+  #  }
 
   $fld_settings =& $field_info['settings'];
 
+  $can_change = variable_get('FIELD_ENCRYPT_CHANGEABLE', TRUE);
+  if(!$can_change) {
+    if(!empty($fld_settings['field_encrypt']['phrase'])) {
+      drupal_set_message('This field is encrypted but the encyrption information cannot be edited. See site admin to change these settings.');
+    }
+   return;
+  }
   $form_state['field_encrypt'] = array(
     'field_name' => $field_name,
     'field_info' => $field_info,
@@ -47,7 +56,7 @@ function _field_encrypt_field_settings_form_alter(&$form, &$form_state, $form_id
       '#title' => t('Encrypt this field'),
       '#default_value' => $form_state['field_encrypt']['encrypt'],
       '#weight' => 0,
-    ),
+  ),
 
     'phrase' => array(
       '#type' => 'textfield',
@@ -58,9 +67,9 @@ function _field_encrypt_field_settings_form_alter(&$form, &$form_state, $form_id
       '#states' => array(
         'visible' => array(
           'input[name="field[settings][field_encrypt][encrypt]"]' => array('checked' => TRUE),
-        ),
-      ),
-    ),
+  ),
+  ),
+  ),
     '#weight' => -2,
   );
 

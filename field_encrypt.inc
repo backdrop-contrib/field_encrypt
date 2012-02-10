@@ -55,9 +55,9 @@ function field_encrypt_un_encrypt($field_info, $phrase) {
 
   $field_name = $field_info['field_name'];
   $results = db_select('field_encrypt', 'fe')
-            ->fields('fe')
-            ->condition('fe.field_name', $field_name)
-            ->execute();
+  ->fields('fe')
+  ->condition('fe.field_name', $field_name)
+  ->execute();
 
   $index = strlen($field_name) + 1;
   foreach ($results as $result) {
@@ -97,9 +97,9 @@ function field_encrypt_re_encrypt($field_info, $new_phrase) {
   // Fetch all the relevant rows
   $field_name = $field_info['field_name'];
   $results = db_select('field_encrypt', 'fe')
-            ->fields('fe')
-            ->condition('fe.field_name', $field_name)
-            ->execute();
+  ->fields('fe')
+  ->condition('fe.field_name', $field_name)
+  ->execute();
 
   $updates = array();
   foreach ($results as $result) {
@@ -119,7 +119,7 @@ function field_encrypt_re_encrypt($field_info, $new_phrase) {
     unset($update['value']);
 
     $query = db_update('field_encrypt')
-            ->fields(array('value' => $value));
+    ->fields(array('value' => $value));
     foreach ($update as $key => $val) {
       $query->condition($key, $val);
     }
@@ -150,7 +150,12 @@ function _field_encrypt_field_storage_pre_update($entity_type, $entity, &$skip_f
   if (is_null($vid)) {
     $vid = $id;
   }
-  $instances = _field_invoke_get_instances($entity_type, $bundle, array());
+  $default_options = array(
+    'default' => FALSE,
+    'deleted' => FALSE,
+    'language' => NULL,
+  );
+  $instances = _field_invoke_get_instances($entity_type, $bundle, $default_options);
 
   $merge_base = array(
     'entity_type' => $entity_type,
@@ -195,9 +200,9 @@ function _field_encrypt_field_storage_pre_update($entity_type, $entity, &$skip_f
           $value["{$field_name}_$key"] = $val;
         }
         db_merge('field_encrypt')
-          ->key($merge_keys)
-          ->fields(array('value' => field_encrypt_encrypt(serialize($value), $field['settings']['field_encrypt']['phrase']))) // encrypt here
-          ->execute();
+        ->key($merge_keys)
+        ->fields(array('value' => field_encrypt_encrypt(serialize($value), $field['settings']['field_encrypt']['phrase']))) // encrypt here
+        ->execute();
       }
     }
   }
@@ -217,7 +222,12 @@ function _field_encrypt_field_storage_pre_load($entity_type, $queried_entities, 
     if (is_null($vid)) {
       $vid = $id;
     }
-    $instances = _field_invoke_get_instances($entity_type, $bundle, array());
+    $default_options = array(
+    'default' => FALSE,
+    'deleted' => FALSE,
+    'language' => NULL,
+    );
+    $instances = _field_invoke_get_instances($entity_type, $bundle, $default_options);
 
     foreach ($instances as $instance) {
       // Get the field data
@@ -238,14 +248,14 @@ function _field_encrypt_field_storage_pre_load($entity_type, $queried_entities, 
 
       // Now we need to fetch the encrypted data
       $results = db_select('field_encrypt', 'fe', array('fetch' => PDO::FETCH_ASSOC))
-              ->fields('fe', array('language', 'delta', 'value'))
-              ->condition('fe.field_name', $field_name)
-              ->condition('fe.entity_type', $entity_type)
-              ->condition('fe.entity_id', $id)
-              ->condition('fe.revision_id', $vid)
-              ->orderBy('fe.language', 'ASC')
-              ->orderBy('fe.delta', 'ASC')
-              ->execute();
+      ->fields('fe', array('language', 'delta', 'value'))
+      ->condition('fe.field_name', $field_name)
+      ->condition('fe.entity_type', $entity_type)
+      ->condition('fe.entity_id', $id)
+      ->condition('fe.revision_id', $vid)
+      ->orderBy('fe.language', 'ASC')
+      ->orderBy('fe.delta', 'ASC')
+      ->execute();
       $field_data = array();
       $index = strlen($field_name) + 1;
       foreach ($results as $result) {
