@@ -6,7 +6,7 @@
  * Encryption functionality for the Field encrypt module.
  */
 
-function field_encrypt_do_encrypt($field_info, $phrase) {
+function field_encrypt_do_encrypt($field_info) {
   $fields = array('field_name', 'entity_type', 'bundle', 'deleted', 'entity_id', 'revision_id', 'language', 'delta', 'value');
   $loop_fields = array('entity_type', 'bundle', 'deleted', 'entity_id', 'revision_id', 'language', 'delta');
 
@@ -28,7 +28,7 @@ function field_encrypt_do_encrypt($field_info, $phrase) {
       unset($result->$field);
     }
     if (isset($field_info['settings']['field_encrypt'])) {
-      $insert['value'] = field_encrypt_encrypt(serialize($result), $field_info['settings']['field_encrypt']['phrase']); // encrypt here
+      $insert['value'] = field_encrypt_encrypt(serialize($result)); // encrypt here
     }
     $inserts[] = $insert;
   }
@@ -50,7 +50,7 @@ function field_encrypt_do_encrypt($field_info, $phrase) {
 
 //-------------------------------------------------------
 
-function field_encrypt_un_encrypt($field_info, $phrase) {
+function field_encrypt_un_encrypt($field_info) {
   $base_fields = array('entity_type', 'bundle', 'deleted', 'entity_id', 'revision_id', 'language', 'delta');
 
   $inserts = array();
@@ -69,7 +69,7 @@ function field_encrypt_un_encrypt($field_info, $phrase) {
       $insert[$field] = $result->$field;
     }
 
-    $value = field_encrypt_decrypt($result->value, $field_info['settings']['field_encrypt']['phrase']);
+    $value = field_encrypt_decrypt($result->value);
     foreach ((array) unserialize($value) as $key => $val) {
       $insert[$key] = $val;
       $fields[] = $key;
@@ -93,7 +93,7 @@ function field_encrypt_un_encrypt($field_info, $phrase) {
 
 //-------------------------------------------------------
 
-function field_encrypt_re_encrypt($field_info, $new_phrase) {
+function field_encrypt_re_encrypt($field_info) {
   $fields = array('field_name', 'entity_type', 'entity_id', 'revision_id', 'language', 'delta');
 
   // Fetch all the relevant rows
@@ -109,8 +109,8 @@ function field_encrypt_re_encrypt($field_info, $new_phrase) {
     foreach ($fields as $field) {
       $update[$field] = $result->$field;
     }
-    $value = field_encrypt_decrypt($result->value, $field_info['settings']['field_encrypt']['phrase']);
-    $update['value'] =  field_encrypt_encrypt($value, $new_phrase);
+    $value = field_encrypt_decrypt($result->value);
+    $update['value'] =  field_encrypt_encrypt($value);
 
     $updates[] = $update;
   }
@@ -203,7 +203,7 @@ function _field_encrypt_field_storage_pre_update($entity_type, $entity, &$skip_f
         }
         db_merge('field_encrypt')
         ->key($merge_keys)
-        ->fields(array('value' => field_encrypt_encrypt(serialize($value), $field['settings']['field_encrypt']['phrase']))) // encrypt here
+        ->fields(array('value' => field_encrypt_encrypt(serialize($value)))) // encrypt here
         ->execute();
       }
     }
@@ -262,7 +262,7 @@ function _field_encrypt_field_storage_pre_load($entity_type, $queried_entities, 
       $index = strlen($field_name) + 1;
       foreach ($results as $result) {
         extract($result); // decrypt here
-        $value = field_encrypt_decrypt($value, $field['settings']['field_encrypt']['phrase']);
+        $value = field_encrypt_decrypt($value);
 
         $item = array();
         foreach ((array) unserialize($value) as $key => $val) {
@@ -278,30 +278,16 @@ function _field_encrypt_field_storage_pre_load($entity_type, $queried_entities, 
 /**
  * Encrypt raw message
  */
-function field_encrypt_encrypt($raw, $key) {
-  $salt_hash = _field_encrypt_salt_hash($key);
-  $encrypted = mcrypt_encrypt(MCRYPT_3DES, $salt_hash, $raw, 'ecb');
-  return base64_encode($encrypted);
+function field_encrypt_encrypt($raw) {
+  $encrypted = encrypt($raw, array('base64' => TRUE));
+  return utf8_encode($encrypted);
 }
 
 /**
  * Decrypt encrypted message
  */
-function field_encrypt_decrypt($encrypted64, $key) {
-  $salt_hash = _field_encrypt_salt_hash($key);
-  $encrypted = base64_decode($encrypted64);
-  $decrypted = mcrypt_decrypt(MCRYPT_3DES, $salt_hash, $encrypted, 'ecb');
-  return rtrim($decrypted, "\0");
-}
-
-/**
- * Make salted and hashed key.
- */
-function _field_encrypt_salt_hash($key) {
-  static $hashes = array();
-  if (!isset($hashes[$key])) {
-    $length = strlen($key)<=24 ? strlen($key) : 24;
-    $hashes[$key] = substr(hash('sha512', $key . drupal_get_hash_salt()), 0, $length);
-  }
-  return $hashes[$key];
+function field_encrypt_decrypt($encrypted) {
+  $encrypted = utf8_decode($encrypted);
+  $decrypted = decrypt($encrypted, array('base64' => TRUE));
+  return $decrypted;
 }

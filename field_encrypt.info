@@ -9,3 +9,4 @@ files[] = field_encrypt.cache.inc
 
 dependencies[] = field
 dependencies[] = field_ui
+dependencies[] = encrypt

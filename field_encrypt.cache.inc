@@ -9,8 +9,6 @@
  */
 
 class FieldEncryptDatabaseCache extends DrupalDatabaseCache {
-  const KEY = 'May the Force be with you';
-
   /**
    * Prepare a cached item.
    *
@@ -41,7 +39,7 @@ class FieldEncryptDatabaseCache extends DrupalDatabaseCache {
 
     // Decrypt the data just before we return it
     module_load_include('inc', 'field_encrypt');
-    $cache->data = field_encrypt_decrypt($cache->data, self::KEY);
+    $cache->data = field_encrypt_decrypt($cache->data);
 
     if ($cache->serialized) {
       $cache->data = unserialize($cache->data);
@@ -67,7 +65,7 @@ class FieldEncryptDatabaseCache extends DrupalDatabaseCache {
 
     // encrypt the data just before it's saved
     module_load_include('inc', 'field_encrypt');
-    $fields['data'] = field_encrypt_encrypt($fields['data'], self::KEY);
+    $fields['data'] = field_encrypt_encrypt($fields['data']);
 
     try {
       db_merge($this->bin)
