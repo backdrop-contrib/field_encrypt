@@ -13,27 +13,31 @@ function field_encrypt_do_encrypt($field_info) {
   $inserts = array();
 
   $field_name = $field_info['field_name'];
-  $table = 'field_data_' . $field_name;
+  $data_table = 'field_data_' . $field_name;
+  $revision_table = 'field_revision_' . $field_name;
 
-  // Get all the current entries
-  $results = db_select($table, 't')->fields('t')->execute();
+  // Get all the current entries from the revision table.
+  $results = db_select($revision_table, 't')->fields('t')->execute();
 
-  // For each result build the insert data for field_encrypt
+  // For each result build the insert data for field_encrypt.
   foreach ($results as $result) {
     $insert = array(
       'field_name' => $field_name,
     );
+
     foreach ($loop_fields as $field) {
       $insert[$field] = $result->$field;
       unset($result->$field);
     }
+
     if (isset($field_info['settings']['field_encrypt'])) {
-      $insert['value'] = field_encrypt_encrypt(serialize($result)); // encrypt here
+      // Encrypt field data.
+      $insert['value'] = field_encrypt_encrypt(serialize($result));
     }
+
     $inserts[] = $insert;
   }
 
-  // Do we have anything to insert?
   if (!empty($inserts)) {
     // Build the multiple insert query and do it.
     $query = db_insert('field_encrypt')->fields($fields);
@@ -42,26 +46,31 @@ function field_encrypt_do_encrypt($field_info) {
     }
     $query->execute();
 
-    // remove the rows from the original table
-    db_delete($table)->execute();
+    // Remove rows from data and revision tables.
+    db_delete($data_table)->execute();
+    db_delete($revision_table)->execute();
   }
+
   drupal_set_message(t('%field_name is now being encrypted', array('%field_name' => $field_name)));
 }
 
-//-------------------------------------------------------
-
+/**
+ * Remove encryption from a field.
+ */
 function field_encrypt_un_encrypt($field_info) {
   $base_fields = array('entity_type', 'bundle', 'deleted', 'entity_id', 'revision_id', 'language', 'delta');
 
-  $inserts = array();
+  $entities = array();
 
   $field_name = $field_info['field_name'];
   $results = db_select('field_encrypt', 'fe')
   ->fields('fe')
   ->condition('fe.field_name', $field_name)
+  ->orderBy('fe.entity_id', 'ASC')
+  ->orderBy('fe.revision_id', 'DESC') // Get the current revision first.
   ->execute();
 
-  $index = strlen($field_name) + 1;
+  // Fetch all records from the encrypt table.
   foreach ($results as $result) {
     $fields = $base_fields;
     $insert = array();
@@ -74,20 +83,33 @@ function field_encrypt_un_encrypt($field_info) {
       $insert[$key] = $val;
       $fields[] = $key;
     }
-    $inserts[] = $insert;
+
+    // Break down data into entity ids so we can control what's revision and what's current data.
+    $entities[$result->entity_id][] = $insert;
   }
 
-  if (!empty($inserts)) {
+  if (!empty($entities)) {
     // Build the multiple insert query and do it.
-    $query = db_insert("field_data_$field_name")->fields($fields);
-    foreach ($inserts as $insert) {
-      $query->values($insert);
-    }
-    $query->execute();
+    $data_query = db_insert("field_data_$field_name")->fields($fields);
+    $revision_query = db_insert("field_revision_$field_name")->fields($fields);
 
-    // remove the rows from the original table
+    foreach ($entities as $revisions) {
+      // Insert the current revision only.
+      $data_query->values($revisions[0]);
+
+      // Insert all revisions into the revision table.
+      foreach ($revisions as $revision) {
+        $revision_query->values($revision);
+      }
+    }
+
+    $data_query->execute();
+    $revision_query->execute();
+
+    // Remove rows from the original table.
     db_delete('field_encrypt')->condition('field_name', $field_name)->execute();
   }
+
   drupal_set_message(t('%field_name is no longer being encrypted', array('%field_name' => $field_name)));
 }
 
