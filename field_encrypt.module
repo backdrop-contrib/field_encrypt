@@ -88,3 +88,22 @@ function field_encrypt_field_storage_pre_load($entity_type, $queried_entities, $
   module_load_include('inc', 'field_encrypt');
   _field_encrypt_field_storage_pre_load($entity_type, $queried_entities, $age, $skip_fields, $options);
 }
+
+/**
+ * Implements hook_entity_delete().
+ */
+function field_encrypt_entity_delete($entity, $type) {
+  list($id, $vid, $bundle) = entity_extract_ids($type, $entity);
+  db_delete('field_encrypt')->condition('entity_type', $type)->condition('entity_id', $id)
+    ->execute();
+}
+
+/**
+ * Implements hook_field_attach_delete_revision().
+ */
+function field_encrypt_field_attach_delete_revision($entity_type, $entity) {
+ list($id, $vid, $bundle) = entity_extract_ids($entity_type, $entity);
+
+  db_delete('field_encrypt')->condition('entity_id', $id)->condition('revision_id', $vid)
+    ->condition('entity_type', $entity_type)->execute();
+}
