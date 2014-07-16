@@ -1,12 +1,9 @@
-; $Id$
-
 name = Field encrypt
 description = Extension of the Field API to allow encryption of fields
 package = Fields
 core = 7.x
 
-files[] = field_encrypt.cache.inc
-
 dependencies[] = field
-dependencies[] = field_ui
 dependencies[] = encrypt
+
+files[] = field_encrypt.cache.inc

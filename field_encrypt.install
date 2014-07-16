@@ -1,6 +1,4 @@
 <?php
-// $Id$
-
 /**
  * @file
  * Field encrypt - Extension of the Field API to allow encryption of certain text fields - install
@@ -62,8 +60,8 @@ function field_encrypt_requirements($phase) {
       }
 
       if (!$encrypt_ok) {
-        $requirements['encryption']['value'] = $t('unavailable');
-        $requirements['encryption']['severity'] = REQUIREMENT_ERROR;
+        $requirements['encryption']['value']       = $t('unavailable');
+        $requirements['encryption']['severity']    = REQUIREMENT_ERROR;
         $requirements['encryption']['description'] = $message;
       }
       else {

@@ -1,20 +1,15 @@
 <?php
-// $Id$
-
 /**
  * @file
- * Field encrypt - Extension of the Field API to allow encryption of fields
+ * Field encrypt - Extension of the Field API to allow encryption of fields.
  *
  * This module allows fields that already exist to be encrypted however once a field
  * table has data any changes to the table structure are forbidden. So encrypted values
  * are held in separate table rather than the original table (which would have been more
  * efficient).
  *
- *
  * @TODO
- *   a. Replace single table with one table per field
- *   b. Use Batch API for switching encryption on and off, and changing phrase
- *   c. Track entity and field deletion?
+ *   a. Use Batch API for switching encryption on and off, and changing phrase.
  */
 define('FIELD_ENCRYPT_DEFAULT', 'Lost in France');
 define('FIELD_ENCRYPT_PERMISSION', 'administer text field encryption');
@@ -26,8 +21,8 @@ define('FIELD_ENCRYPT_TABLE_PREFIX', 'field_encrypt_');
 function field_encrypt_permission() {
   return array(
     FIELD_ENCRYPT_PERMISSION => array(
-      'title' => t('Administer text field encryption'),
-      'description' => t('Allows certain text fields to be individually encrypted so that their data is better protected.'),
+      'title'           => t('Administer text field encryption'),
+      'description'     => t('Allows certain text fields to be individually encrypted so that their data is better protected.'),
       'restrict access' => TRUE,
     ),
   );
@@ -60,10 +55,9 @@ function field_encrypt_form_system_modules_alter(&$form, &$form_state, $form_id)
   // If there are any encrypted fields, prevent the module from being disabled
   if (!empty($fields)) {
     $form['modules']['Fields']['field_encrypt']['enable']['#disabled'] = TRUE;
-    $field_list = theme('item_list', array('items' => $fields));
-    $form['modules']['Fields']['field_encrypt']['#required_by'][] = t('Encrypted fields: <span class="admin-enabled">!fields</span>.', array('!fields' => $field_list));
+    $field_list                                                        = theme('item_list', array('items' => $fields));
+    $form['modules']['Fields']['field_encrypt']['#required_by'][]      = t('Encrypted fields: <span class="admin-enabled">!fields</span>.', array('!fields' => $field_list));
   }
-
 }
 
 /**

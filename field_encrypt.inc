@@ -12,8 +12,8 @@
 function field_encrypt_do_encrypt($field_info) {
   // Column spec for encrypted data.
   $spec = array(
-    'type' => 'text',
-    'size' => 'medium',
+    'type'        => 'text',
+    'size'        => 'medium',
     'description' => 'The encrypted value for this entity field column.',
   );
 
@@ -102,11 +102,11 @@ function _field_encrypt_field_storage_pre_update($entity_type, $entity, &$skip_f
     $vid = $id;
   }
   $default_options = array(
-    'default' => FALSE,
-    'deleted' => FALSE,
+    'default'  => FALSE,
+    'deleted'  => FALSE,
     'language' => NULL,
   );
-  $instances = _field_invoke_get_instances($entity_type, $bundle, $default_options);
+  $instances       = _field_invoke_get_instances($entity_type, $bundle, $default_options);
 
   foreach ($instances as $instance) {
     $merge_keys = array(
@@ -116,7 +116,7 @@ function _field_encrypt_field_storage_pre_update($entity_type, $entity, &$skip_f
     );
 
     // Get the field data
-    $field_id = $instance['field_id'];
+    $field_id           = $instance['field_id'];
     $current_field_info = $field_info[$field_id];
 
     // Are we encrypting this field?
@@ -125,8 +125,8 @@ function _field_encrypt_field_storage_pre_update($entity_type, $entity, &$skip_f
       continue;
     }
 
-    $field_name = $instance['field_name'];
-    $data_table = key($current_field_info['storage']['details']['sql'][FIELD_LOAD_CURRENT]);
+    $field_name     = $instance['field_name'];
+    $data_table     = key($current_field_info['storage']['details']['sql'][FIELD_LOAD_CURRENT]);
     $revision_table = key($current_field_info['storage']['details']['sql'][FIELD_LOAD_REVISION]);
 
     // We're bypassing usual storage, mark field for skipping.
@@ -143,7 +143,7 @@ function _field_encrypt_field_storage_pre_update($entity_type, $entity, &$skip_f
       $merge_keys['language'] = $language;
       foreach ($items as $delta => $item) {
         $merge_keys['delta'] = $delta;
-		
+
         $fields = array(
           'revision_id' => $vid,
         );
@@ -152,10 +152,10 @@ function _field_encrypt_field_storage_pre_update($entity_type, $entity, &$skip_f
             $fields[$field] = !isset($current_field_info['indexes'][$column]) ? field_encrypt_encrypt($item[$column]) : $item[$column];
           }
         }
-		
+
         // Put data in data table.
         db_merge($data_table)->key($merge_keys)->fields($fields)->execute();
-		  
+
         // Put data in revision table.
         $merge_keys['revision_id'] = $vid;
         unset($fields['revision_id']);
@@ -180,15 +180,15 @@ function _field_encrypt_field_storage_pre_load($entity_type, $queried_entities, 
       $vid = $id;
     }
     $default_options = array(
-    'default' => FALSE,
-    'deleted' => FALSE,
-    'language' => NULL,
+      'default'  => FALSE,
+      'deleted'  => FALSE,
+      'language' => NULL,
     );
-    $instances = _field_invoke_get_instances($entity_type, $bundle, $default_options);
+    $instances       = _field_invoke_get_instances($entity_type, $bundle, $default_options);
 
     foreach ($instances as $instance) {
       // Get the field data
-      $field_id = $instance['field_id'];
+      $field_id           = $instance['field_id'];
       $current_field_info = $field_info[$field_id];
 
       // Are we encrypting this field?
@@ -197,18 +197,18 @@ function _field_encrypt_field_storage_pre_load($entity_type, $queried_entities, 
       }
 
       $field_name = $instance['field_name'];
-      $table = key($current_field_info['storage']['details']['sql'][FIELD_LOAD_REVISION]);
+      $table      = key($current_field_info['storage']['details']['sql'][FIELD_LOAD_REVISION]);
 
       // We're bypassing usual storage, mark field for skipping
       $skip_fields[$field_id] = $current_field_info;
 
-      // Now we need to fetch the encrypted data		
+      // Now we need to fetch the encrypted data
       $results = db_select($table, 'r')->fields('r')
         ->condition('r.entity_type', $entity_type)
         ->condition('r.entity_id', $id)->condition('r.revision_id', $vid)
         ->orderBy('r.language', 'ASC')->orderBy('r.delta', 'ASC')->execute()
         ->fetchAll();
-		
+
       $field_data = array();
       foreach ($results as $result) {
         foreach ($current_field_info['storage']['details']['sql'][FIELD_LOAD_REVISION][$table] as $column => $field) {
@@ -227,6 +227,7 @@ function _field_encrypt_field_storage_pre_load($entity_type, $queried_entities, 
  */
 function field_encrypt_encrypt($raw) {
   $encrypted = encrypt($raw, array('base64' => TRUE));
+
   return utf8_encode($encrypted);
 }
 
@@ -236,5 +237,6 @@ function field_encrypt_encrypt($raw) {
 function field_encrypt_decrypt($encrypted) {
   $encrypted = utf8_decode($encrypted);
   $decrypted = decrypt($encrypted, array('base64' => TRUE));
+
   return $decrypted;
 }

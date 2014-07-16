@@ -1,6 +1,4 @@
 <?php
-// $Id$
-
 /**
  * @file
  * Field encrypt - Extension of the Field API to allow encryption of fields - class
@@ -8,6 +6,9 @@
  * Modify the set & get methods to encrypt/decrypt the cache, use internal key
  */
 
+/**
+ * Class FieldEncryptDatabaseCache
+ */
 class FieldEncryptDatabaseCache extends DrupalDatabaseCache {
   /**
    * Prepare a cached item.
@@ -17,6 +18,7 @@ class FieldEncryptDatabaseCache extends DrupalDatabaseCache {
    *
    * @param $cache
    *   An item loaded from cache_get() or cache_get_multiple().
+   *
    * @return
    *   The item with data unserialized as appropriate or FALSE if there is no
    *   valid item to load.
@@ -51,15 +53,15 @@ class FieldEncryptDatabaseCache extends DrupalDatabaseCache {
   function set($cid, $data, $expire = CACHE_PERMANENT) {
     $fields = array(
       'serialized' => 0,
-      'created' => REQUEST_TIME,
-      'expire' => $expire,
+      'created'    => REQUEST_TIME,
+      'expire'     => $expire,
     );
     if (!is_string($data)) {
-      $fields['data'] = serialize($data);
+      $fields['data']       = serialize($data);
       $fields['serialized'] = 1;
     }
     else {
-      $fields['data'] = $data;
+      $fields['data']       = $data;
       $fields['serialized'] = 0;
     }
 
@@ -68,9 +70,7 @@ class FieldEncryptDatabaseCache extends DrupalDatabaseCache {
     $fields['data'] = field_encrypt_encrypt($fields['data']);
 
     try {
-      db_merge($this->bin)
-        ->key(array('cid' => $cid))
-        ->fields($fields)
+      db_merge($this->bin)->key(array('cid' => $cid))->fields($fields)
         ->execute();
     }
     catch (Exception $e) {
