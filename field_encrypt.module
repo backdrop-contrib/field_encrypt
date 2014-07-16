@@ -114,21 +114,20 @@ function field_encrypt_field_create_field($field) {
 
 /**
  * Implements hook_field_update_field().
- *
- * Encryption is enabled/disabled based on expected settings, not current
- * settings as any trigger to rebuild the field will not respect encryption
- * settings and it is difficult to determine the current state.
  */
 function field_encrypt_field_update_field($field, $prior_field, $has_data) {
-  module_load_include('inc', 'field_encrypt');
-
-  // Turn on encryption.
-  if (isset($field['settings']['field_encrypt']['encrypt']) && $field['settings']['field_encrypt']['encrypt']) {
+  // Encryption is enabled either if the field has no data irrespective of the
+  // prior settings, or if it has data and the settings are changed from the
+  // prior settings. This ensures that fields reverted/updated externally  will
+  // always keep the encryption schema modifications.
+  if (isset($field['settings']['field_encrypt']['encrypt']) && $field['settings']['field_encrypt']['encrypt'] && (!$has_data || (!isset($prior_field['settings']['field_encrypt']['encrypt']) || !$prior_field['settings']['field_encrypt']['encrypt']))) {
+    module_load_include('inc', 'field_encrypt');
     field_encrypt_do_encrypt($field, $has_data);
   }
 
   // Turn off encryption.
-  else {
+  elseif (isset($field['settings']['field_encrypt']['encrypt']) && !$field['settings']['field_encrypt']['encrypt'] && isset($prior_field['settings']['field_encrypt']['encrypt']) && $prior_field['settings']['field_encrypt']['encrypt']) {
+    module_load_include('inc', 'field_encrypt');
     field_encrypt_un_encrypt($field, $has_data);
   }
 }
