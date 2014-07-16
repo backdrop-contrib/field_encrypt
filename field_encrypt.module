@@ -103,19 +103,33 @@ function field_encrypt_form_system_modules_alter(&$form, &$form_state, $form_id)
 }
 
 /**
+ * Implements hook_field_create_field().
+ */
+function field_encrypt_field_create_field($field) {
+  if (isset($field['settings']['field_encrypt']['encrypt']) && $field['settings']['field_encrypt']['encrypt']) {
+    module_load_include('inc', 'field_encrypt');
+    field_encrypt_do_encrypt($field, FALSE);
+  }
+}
+
+/**
  * Implements hook_field_update_field().
+ *
+ * Encryption is enabled/disabled based on expected settings, not current
+ * settings as any trigger to rebuild the field will not respect encryption
+ * settings and it is difficult to determine the current state.
  */
 function field_encrypt_field_update_field($field, $prior_field, $has_data) {
-  // Turn off encryption.
-  if (isset($prior_field['settings']['field_encrypt']['encrypt']) && $prior_field['settings']['field_encrypt']['encrypt'] && !$field['settings']['field_encrypt']['encrypt']) {
-    module_load_include('inc', 'field_encrypt');
-    field_encrypt_un_encrypt($field, $has_data);
-  }
+  module_load_include('inc', 'field_encrypt');
 
   // Turn on encryption.
-  elseif (isset($prior_field['settings']['field_encrypt']['encrypt']) && $field['settings']['field_encrypt']['encrypt'] && (!isset($prior_field['settings']['field_encrypt']['encrypt']) || !$prior_field['settings']['field_encrypt']['encrypt'])) {
-    module_load_include('inc', 'field_encrypt');
+  if (isset($field['settings']['field_encrypt']['encrypt']) && $field['settings']['field_encrypt']['encrypt']) {
     field_encrypt_do_encrypt($field, $has_data);
+  }
+
+  // Turn off encryption.
+  else {
+    field_encrypt_un_encrypt($field, $has_data);
   }
 }
 

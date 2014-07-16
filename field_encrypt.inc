@@ -20,6 +20,11 @@ function field_encrypt_do_encrypt($field_info, $has_data) {
     'description' => 'The encrypted value for this entity field column.',
   );
 
+  // Prepare field so the storage details are available.
+  $cache = _field_info_field_cache();
+  $cache->flush();
+  $field_info = $cache->prepareField($field_info);
+
   foreach (array(FIELD_LOAD_CURRENT, FIELD_LOAD_REVISION) as $key) {
     $table = key($field_info['storage']['details']['sql'][$key]);
 
@@ -61,6 +66,11 @@ function field_encrypt_do_encrypt($field_info, $has_data) {
  * @param $has_data
  */
 function field_encrypt_un_encrypt($field_info, $has_data) {
+  // Prepare field so the storage details are available.
+  $cache = _field_info_field_cache();
+  $cache->flush();
+  $field_info = $cache->prepareField($field_info);
+
   foreach (array(FIELD_LOAD_CURRENT, FIELD_LOAD_REVISION) as $key) {
     $table = key($field_info['storage']['details']['sql'][$key]);
 
