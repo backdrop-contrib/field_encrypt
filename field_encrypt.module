@@ -99,30 +99,23 @@ function field_encrypt_entity_delete($entity, $type) {
   // for this entity.
   $encrypted_field_tables = db_find_tables(FIELD_ENCRYPT_TABLE_PREFIX . '%');
   foreach ($encrypted_field_tables as $encrypted_field_table) {
-    db_delete($encrypted_field_table)->condition('entity_type', $type)->condition('entity_id', $id)
-      ->execute();
+    db_delete($encrypted_field_table)->condition('entity_type', $type)
+      ->condition('entity_id', $id)->execute();
   }
-}
-
-function field_encrypt_field_load($entity_type, $entities, $field, $instances, $langcode, &$items, $age) {
-	//dpm($items);
-}
-
-function field_encrypt_field_display_alter(&$display, $context) {
-	//dpm($context);	
 }
 
 /**
  * Implements hook_field_attach_delete_revision().
  */
 function field_encrypt_field_attach_delete_revision($entity_type, $entity) {
- list($id, $vid, $bundle) = entity_extract_ids($entity_type, $entity);
+  list($id, $vid, $bundle) = entity_extract_ids($entity_type, $entity);
 
   // Loop through all encrypted field tables, deleting any fields
   // for this revision.
   $encrypted_field_tables = db_find_tables(FIELD_ENCRYPT_TABLE_PREFIX . '%');
   foreach ($encrypted_field_tables as $encrypted_field_table) {
-    db_delete($encrypted_field_table)->condition('entity_id', $id)->condition('revision_id', $vid)
-      ->condition('entity_type', $entity_type)->execute();
+    db_delete($encrypted_field_table)->condition('entity_id', $id)
+      ->condition('revision_id', $vid)->condition('entity_type', $entity_type)
+      ->execute();
   }
 }

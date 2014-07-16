@@ -19,11 +19,6 @@ function _field_encrypt_field_settings_form_alter(&$form, &$form_state, $form_id
   $field_info = field_info_field($field_name);
   $field_type_info = field_info_field_types($field_info['type']);
 
-  // If this field type cannot be encrypted, exit here
-  #  if ($field_type_info['property_type']!='text') {
-  #    return;
-  #  }
-
   $fld_settings =& $field_info['settings'];
 
   $form_state['field_encrypt'] = array(
@@ -38,7 +33,7 @@ function _field_encrypt_field_settings_form_alter(&$form, &$form_state, $form_id
   $settings['field_encrypt'] = array(
     '#type' => 'fieldset',
     '#title' => t('Encrypt this field'),
-    '#description' => t('Set up the parameters for encrypting this text field.'),
+    '#description' => t('Set up the parameters for encrypting this field.'),
     '#tree' => TRUE,
     'encrypt' => array(
       '#type' => 'checkbox',

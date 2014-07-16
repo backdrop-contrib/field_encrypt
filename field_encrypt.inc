@@ -1,6 +1,4 @@
 <?php
-// $Id$
-
 /**
  * @file
  * Encryption functionality for the Field encrypt module.
@@ -12,36 +10,39 @@
  * Called when the "Encrypt this field" setting is first applied.
  */
 function field_encrypt_do_encrypt($field_info) {
+  // Column spec for encrypted data.
+  $spec = array(
+    'type' => 'text',
+    'size' => 'medium',
+    'description' => 'The encrypted value for this entity field column.',
+  );
 
-  $field_name = $field_info['field_name'];
-  $data_table = 'field_data_' . $field_name;
-  $revision_table = 'field_revision_' . $field_name;
-  $value_field = $field_name . '_value';
+  foreach (array(FIELD_LOAD_CURRENT, FIELD_LOAD_REVISION) as $key) {
+    $table = key($field_info['storage']['details']['sql'][$key]);
 
-  // Get all the current entries.
-  $data = db_select($data_table, 't')->fields('t')->execute()->fetchAll();
-  $revisions = db_select($revision_table, 't')->fields('t')->execute()->fetchAll();
+    // Get all the current entries.
+    $data = db_select($table, 't')->fields('t')->execute()->fetchAll();
 
-  // Delete the existing unencrypted data.
-  db_delete($data_table)->execute();
-  db_delete($revision_table)->execute();
+    // Delete the existing unencrypted data.
+    db_delete($table)->execute();
 
-  // Make the field encryptable.
-  make_field_encryptable($field_info);
+    // Alter field columns to allow for encrypted data.
+    foreach ($field_info['storage']['details']['sql'][$key][$table] as $column => $field) {
+      if (!isset($field_info['indexes'][$column])) {
+        db_change_field($table, $field, $field, $spec);
+      }
+    }
 
-  // Encrypt and re-insert the data.
-  foreach($data as $k => $record) {
-    $record->{$value_field} = field_encrypt_encrypt(serialize($record->{$value_field}));
-    drupal_write_record($data_table, $record);
+    // Encrypt and re-insert the data.
+    foreach ($data as $record) {
+      foreach ($field_info['storage']['details']['sql'][$key][$table] as $field) {
+        $record->{$field} = field_encrypt_encrypt($record->{$field});
+      }
+      drupal_write_record($table, $record);
+    }
   }
 
-  // Encrypt and re-insert the revisions.
-  foreach($revisions as $k => $record) {
-    $record->{$value_field} = field_encrypt_encrypt(serialize($record->{$value_field}));
-    drupal_write_record($revision_table, $record);
-  }
-
-  drupal_set_message(t('%field_name is now being encrypted', array('%field_name' => $field_name)));
+  drupal_set_message(t('%field_name is now being encrypted', array('%field_name' => $field_info['field_name'])));
 }
 
 /**
@@ -50,44 +51,34 @@ function field_encrypt_do_encrypt($field_info) {
  * Called when the "Encrypt this field" setting is disabled.
  */
 function field_encrypt_un_encrypt($field_info) {
+  foreach (array(FIELD_LOAD_CURRENT, FIELD_LOAD_REVISION) as $key) {
+    $table = key($field_info['storage']['details']['sql'][$key]);
 
-  $field_name = $field_info['field_name'];
-  $data_table = 'field_data_' . $field_name;
-  $revision_table = 'field_revision_' . $field_name;
-  $value_field = $field_name . '_value';
+    // Get all the current entries.
+    $data = db_select($table, 't')->fields('t')->execute()->fetchAll();
 
-  // Get all the current entries.
-  $data = db_select($data_table, 't')->fields('t')->execute()->fetchAll();
-  $revisions = db_select($revision_table, 't')->fields('t')->execute()->fetchAll();
+    // Delete the existing encrypted data.
+    db_delete($table)->execute();
 
-  // Delete the existing encrypted data.
-  db_delete($data_table)->execute();
-  db_delete($revision_table)->execute();
+    // Revert the field columns back to their original state.
+    foreach ($field_info['storage']['details']['sql'][$key][$table] as $column => $field) {
+      if (!isset($field_info['indexes'][$column])) {
+        db_change_field($table, $field, $field, $field_info['columns'][$column]);
+      }
+    }
 
-  // Set the field back to un-encryptable.
-  make_field_unencryptable($field_info);
-
-  // Decrypt and re-insert the data.
-  foreach($data as $k => $record) {
-    $value = unserialize(field_encrypt_decrypt($record->{$value_field}));
-	if(is_array($value)) {
-		$value = $value[key($value)];
-	}
-    $record->{$value_field} = $value;
-    drupal_write_record($data_table, $record);
+    // Decrypt and re-insert the data.
+    foreach ($data as $record) {
+      foreach ($field_info['storage']['details']['sql'][$key][$table] as $field) {
+        if (isset($record->{$field}) && !empty($record->{$field})) {
+          $record->{$field} = field_encrypt_decrypt($record->{$field});
+        }
+      }
+      drupal_write_record($table, $record);
+    }
   }
 
-  // Encrypt and re-insert the revisions.
-  foreach($revisions as $k => $record) {
-  	$value = unserialize(field_encrypt_decrypt($record->{$value_field}));
-	if(is_array($value)) {
-	  $value = $value[key($value)];		
-	}
-    $record->{$value_field} = $value;
-    drupal_write_record($revision_table, $record);
-  }
-
-  drupal_set_message(t('%field_name is no longer being encrypted', array('%field_name' => $field_name)));
+  drupal_set_message(t('%field_name is no longer being encrypted', array('%field_name' => $field_info['field_name'])));
 }
 
 /**
@@ -102,7 +93,7 @@ function _field_encrypt_field_storage_pre_insert($entity_type, $entity, &$skip_f
  */
 function _field_encrypt_field_storage_pre_update($entity_type, $entity, &$skip_fields) {
   static $field_info = NULL;
-  if ($field_info===NULL) {
+  if ($field_info === NULL) {
     $field_info = field_info_field_by_ids();
   }
 
@@ -117,67 +108,58 @@ function _field_encrypt_field_storage_pre_update($entity_type, $entity, &$skip_f
   );
   $instances = _field_invoke_get_instances($entity_type, $bundle, $default_options);
 
-  $merge_keys = array(
-    'entity_type' => $entity_type,
-    'deleted' => 0,
-    'entity_id' => $id,
-  );
-
   foreach ($instances as $instance) {
+    $merge_keys = array(
+      'entity_type' => $entity_type,
+      'deleted'     => 0,
+      'entity_id'   => $id,
+    );
+
     // Get the field data
     $field_id = $instance['field_id'];
-    $field = $field_info[$field_id];
+    $current_field_info = $field_info[$field_id];
 
     // Are we encrypting this field?
-    if (!isset($field['settings']['field_encrypt']['encrypt'])) {
-      // encryption setting does not exist, skip it
+    if (!isset($current_field_info['settings']['field_encrypt']['encrypt']) || !$current_field_info['settings']['field_encrypt']['encrypt']) {
+      // Encryption setting is set to FALSE, skip it.
       continue;
     }
-    if (!$field['settings']['field_encrypt']['encrypt']) {
-      // encryption setting is set to FALSE, skip it
-      continue;
-    }
+
     $field_name = $instance['field_name'];
-	$data_table = 'field_data_' . $field_name;
-	$revision_table = 'field_revision_' . $field_name;
-	$value_field = $field_name . '_value';
+    $data_table = key($current_field_info['storage']['details']['sql'][FIELD_LOAD_CURRENT]);
+    $revision_table = key($current_field_info['storage']['details']['sql'][FIELD_LOAD_REVISION]);
 
-    // We're bypassing usual storage, mark field for skipping
-    $skip_fields[$field_id] = $field;
+    // We're bypassing usual storage, mark field for skipping.
+    $skip_fields[$field_id] = $current_field_info;
 
-    // If there's nothing in the field, go no further
-    if (empty($entity->$field_name)) {
+    // If there's nothing in the field, go no further.
+    if (empty($entity->{$field_name})) {
       continue;
     }
 
-    // Now we need to insert the data, we can't do multiple
-    // merges so we have to do each language/delta separately.
-    foreach ($entity->$field_name as $language => $items) {
+    // Now we need to insert the data, we can't do multiple merges so we have to
+    // do each language/delta separately.
+    foreach ($entity->{$field_name} as $language => $items) {
       $merge_keys['language'] = $language;
       foreach ($items as $delta => $item) {
         $merge_keys['delta'] = $delta;
-        $value = array();
-        foreach ($item as $key => $val) {
-          $value["{$field_name}_$key"] = $val;
+		
+        $fields = array(
+          'revision_id' => $vid,
+        );
+        foreach ($current_field_info['storage']['details']['sql'][FIELD_LOAD_CURRENT][$data_table] as $column => $field) {
+          if (isset($item[$column]) && !empty($item[$column])) {
+            $fields[$field] = !isset($current_field_info['indexes'][$column]) ? field_encrypt_encrypt($item[$column]) : $item[$column];
+          }
         }
 		
-		$fields = array(
-			$value_field => field_encrypt_encrypt(serialize($value)),  // encrypt here 
-			'revision_id' => $vid,
-		);
-		// Put data in data table.
-        db_merge($data_table)
-          ->key($merge_keys)
-          ->fields($fields)
-          ->execute();
+        // Put data in data table.
+        db_merge($data_table)->key($merge_keys)->fields($fields)->execute();
 		  
-		// Put data in revision table.
-		$merge_keys['revision_id'] = $vid;
-		unset($fields['revision_id']);
-		db_merge($revision_table)
-          ->key($merge_keys)
-          ->fields($fields)
-          ->execute();
+        // Put data in revision table.
+        $merge_keys['revision_id'] = $vid;
+        unset($fields['revision_id']);
+        db_merge($revision_table)->key($merge_keys)->fields($fields)->execute();
       }
     }
   }
@@ -188,7 +170,7 @@ function _field_encrypt_field_storage_pre_update($entity_type, $entity, &$skip_f
  */
 function _field_encrypt_field_storage_pre_load($entity_type, $queried_entities, $age, &$skip_fields, $options) {
   static $field_info = NULL;
-  if ($field_info===NULL) {
+  if ($field_info === NULL) {
     $field_info = field_info_field_by_ids();
   }
 
@@ -207,45 +189,35 @@ function _field_encrypt_field_storage_pre_load($entity_type, $queried_entities, 
     foreach ($instances as $instance) {
       // Get the field data
       $field_id = $instance['field_id'];
-      $field = $field_info[$field_id];
+      $current_field_info = $field_info[$field_id];
 
       // Are we encrypting this field?
-      if (!isset($field['settings']['field_encrypt']['encrypt'])) {
+      if (!isset($current_field_info['settings']['field_encrypt']['encrypt']) || !$current_field_info['settings']['field_encrypt']['encrypt']) {
         continue;
       }
-      if (!$field['settings']['field_encrypt']['encrypt']) {
-        continue;
-      }
+
       $field_name = $instance['field_name'];
-	  $revision_table = 'field_revision_' . $field_name;
-	  $value_field = $field_name . '_value';
+      $table = key($current_field_info['storage']['details']['sql'][FIELD_LOAD_REVISION]);
 
       // We're bypassing usual storage, mark field for skipping
-      $skip_fields[$field_id] = $field;
+      $skip_fields[$field_id] = $current_field_info;
 
       // Now we need to fetch the encrypted data		
-	  $results = db_select($revision_table, 'fe', array('fetch' => PDO::FETCH_ASSOC))
-        ->fields('fe', array('language', 'delta', $value_field))
-        ->condition('fe.entity_type', $entity_type)
-        ->condition('fe.entity_id', $id)
-        ->condition('fe.revision_id', $vid)
-        ->orderBy('fe.language', 'ASC')
-        ->orderBy('fe.delta', 'ASC')
-        ->execute();	
+      $results = db_select($table, 'r')->fields('r')
+        ->condition('r.entity_type', $entity_type)
+        ->condition('r.entity_id', $id)->condition('r.revision_id', $vid)
+        ->orderBy('r.language', 'ASC')->orderBy('r.delta', 'ASC')->execute()
+        ->fetchAll();
 		
       $field_data = array();
-      $index = strlen($field_name) + 1;
       foreach ($results as $result) {
-      	
-        extract($result); // decrypt here
-        $value = field_encrypt_decrypt($$value_field);
-        $item = array();
-        foreach ((array) unserialize($value) as $key => $val) {
-          $item[substr($key, $index)] = $val;
+        foreach ($current_field_info['storage']['details']['sql'][FIELD_LOAD_REVISION][$table] as $column => $field) {
+          if (isset($result->{$field}) && !empty($result->{$field})) {
+            $field_data[$result->language][$result->delta][$column] = !isset($current_field_info['indexes'][$column]) ? field_encrypt_decrypt($result->{$field}) : $result->{$field};
+          }
         }
-        $field_data[$language][$delta] = $item;
       }
-      $entity->$field_name = $field_data;
+      $entity->{$field_name} = $field_data;
     }
   }
 }
@@ -265,52 +237,4 @@ function field_encrypt_decrypt($encrypted) {
   $encrypted = utf8_decode($encrypted);
   $decrypted = decrypt($encrypted, array('base64' => TRUE));
   return $decrypted;
-}
-
-/**
- * Alter the data and revision table to allow storing of encrypted data.
- */
-function make_field_encryptable($field_info = NULL) {
-  if (!$field_info) {
-    return FALSE;
-  }
-
-  $field_name = $field_info['field_name'];
-  $data_table = 'field_data_' . $field_name;
-  $revision_table = 'field_revision_' . $field_name;
-  $value_field = $field_name . '_value';
-
-  $spec = array(
-    'type' => 'text',
-    'size' => 'medium',
-    'description' => 'The encrypted value for this entity field language/delta.',
-  );
-
-  db_change_field($data_table, $value_field, $value_field, $spec);
-  db_change_field($revision_table, $value_field, $value_field, $spec);
-
-}
-
-/**
- * Alter the data and revision table to disallow storing of encrypted data.
- */
-function make_field_unencryptable($field_info = NULL) {
-  if (!$field_info) {
-    return FALSE;
-  }
-
-  $field_name = $field_info['field_name'];
-  $data_table = 'field_data_' . $field_name;
-  $revision_table = 'field_revision_' . $field_name;
-  $value_field = $field_name . '_value';
-
-  $spec = array(
-    'type' => 'varchar',
-    'length' => 255,
-    'description' => '',
-  );
-
-  db_change_field($data_table, $value_field, $value_field, $spec);
-  db_change_field($revision_table, $value_field, $value_field, $spec);
-
 }

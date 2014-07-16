@@ -33,7 +33,7 @@ function field_encrypt_disable() {
 
   // set the old class for this bin, if there was one.
   $old_cache = variable_get('field_encrypt_old_cache', NULL);
-  if ($old_cache===NULL) {
+  if ($old_cache === NULL) {
     variable_del('cache_class_cache_field');
   }
   else {
