@@ -46,8 +46,10 @@ function field_encrypt_do_encrypt($field_info, $has_data) {
     // Encrypt and re-insert the data.
     if ($has_data) {
       foreach ($data as $record) {
-        foreach ($field_info['storage']['details']['sql'][$key][$table] as $field) {
-          $record->{$field} = field_encrypt_encrypt($record->{$field});
+        foreach ($field_info['storage']['details']['sql'][$key][$table] as $column => $field) {
+          if (!isset($field_info['indexes'][$column])) {
+            $record->{$field} = field_encrypt_encrypt($record->{$field});
+          }
         }
         drupal_write_record($table, $record);
       }
@@ -92,8 +94,8 @@ function field_encrypt_un_encrypt($field_info, $has_data) {
     // Decrypt and re-insert the data.
     if ($has_data) {
       foreach ($data as $record) {
-        foreach ($field_info['storage']['details']['sql'][$key][$table] as $field) {
-          if (isset($record->{$field}) && !empty($record->{$field})) {
+        foreach ($field_info['storage']['details']['sql'][$key][$table] as $column => $field) {
+          if (isset($record->{$field}) && !empty($record->{$field}) && !isset($field_info['indexes'][$column])) {
             $record->{$field} = field_encrypt_decrypt($record->{$field});
           }
         }
