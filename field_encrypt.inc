@@ -128,12 +128,6 @@ function _field_encrypt_field_storage_pre_update($entity_type, $entity, &$skip_f
   $instances       = _field_invoke_get_instances($entity_type, $bundle, $default_options);
 
   foreach ($instances as $instance) {
-    $merge_keys = array(
-      'entity_type' => $entity_type,
-      'deleted'     => 0,
-      'entity_id'   => $id,
-    );
-
     // Get the field data
     $field_id           = $instance['field_id'];
     $current_field_info = $field_info[$field_id];
@@ -159,9 +153,15 @@ function _field_encrypt_field_storage_pre_update($entity_type, $entity, &$skip_f
     // Now we need to insert the data, we can't do multiple merges so we have to
     // do each language/delta separately.
     foreach ($entity->{$field_name} as $language => $items) {
-      $merge_keys['language'] = $language;
       foreach ($items as $delta => $item) {
-        $merge_keys['delta'] = $delta;
+        $merge_keys = array(
+          'entity_type' => $entity_type,
+          'bundle'      => $bundle,
+          'deleted'     => 0,
+          'entity_id'   => $id,
+          'language'    => $language,
+          'delta'       => $delta,
+        );
 
         $fields = array(
           'revision_id' => $vid,
