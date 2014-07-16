@@ -8,8 +8,11 @@
  * Add encryption to a field.
  *
  * Called when the "Encrypt this field" setting is first applied.
+ *
+ * @param $field_info
+ * @param $has_data
  */
-function field_encrypt_do_encrypt($field_info) {
+function field_encrypt_do_encrypt($field_info, $has_data) {
   // Column spec for encrypted data.
   $spec = array(
     'type'        => 'text',
@@ -20,11 +23,13 @@ function field_encrypt_do_encrypt($field_info) {
   foreach (array(FIELD_LOAD_CURRENT, FIELD_LOAD_REVISION) as $key) {
     $table = key($field_info['storage']['details']['sql'][$key]);
 
-    // Get all the current entries.
-    $data = db_select($table, 't')->fields('t')->execute()->fetchAll();
+    if ($has_data) {
+      // Get all the current entries.
+      $data = db_select($table, 't')->fields('t')->execute()->fetchAll();
 
-    // Delete the existing unencrypted data.
-    db_delete($table)->execute();
+      // Delete the existing unencrypted data.
+      db_delete($table)->execute();
+    }
 
     // Alter field columns to allow for encrypted data.
     foreach ($field_info['storage']['details']['sql'][$key][$table] as $column => $field) {
@@ -34,11 +39,13 @@ function field_encrypt_do_encrypt($field_info) {
     }
 
     // Encrypt and re-insert the data.
-    foreach ($data as $record) {
-      foreach ($field_info['storage']['details']['sql'][$key][$table] as $field) {
-        $record->{$field} = field_encrypt_encrypt($record->{$field});
+    if ($has_data) {
+      foreach ($data as $record) {
+        foreach ($field_info['storage']['details']['sql'][$key][$table] as $field) {
+          $record->{$field} = field_encrypt_encrypt($record->{$field});
+        }
+        drupal_write_record($table, $record);
       }
-      drupal_write_record($table, $record);
     }
   }
 
@@ -49,16 +56,21 @@ function field_encrypt_do_encrypt($field_info) {
  * Remove encryption from a field.
  *
  * Called when the "Encrypt this field" setting is disabled.
+ *
+ * @param $field_info
+ * @param $has_data
  */
-function field_encrypt_un_encrypt($field_info) {
+function field_encrypt_un_encrypt($field_info, $has_data) {
   foreach (array(FIELD_LOAD_CURRENT, FIELD_LOAD_REVISION) as $key) {
     $table = key($field_info['storage']['details']['sql'][$key]);
 
-    // Get all the current entries.
-    $data = db_select($table, 't')->fields('t')->execute()->fetchAll();
+    if ($has_data) {
+      // Get all the current entries.
+      $data = db_select($table, 't')->fields('t')->execute()->fetchAll();
 
-    // Delete the existing encrypted data.
-    db_delete($table)->execute();
+      // Delete the existing encrypted data.
+      db_delete($table)->execute();
+    }
 
     // Revert the field columns back to their original state.
     foreach ($field_info['storage']['details']['sql'][$key][$table] as $column => $field) {
@@ -68,24 +80,19 @@ function field_encrypt_un_encrypt($field_info) {
     }
 
     // Decrypt and re-insert the data.
-    foreach ($data as $record) {
-      foreach ($field_info['storage']['details']['sql'][$key][$table] as $field) {
-        if (isset($record->{$field}) && !empty($record->{$field})) {
-          $record->{$field} = field_encrypt_decrypt($record->{$field});
+    if ($has_data) {
+      foreach ($data as $record) {
+        foreach ($field_info['storage']['details']['sql'][$key][$table] as $field) {
+          if (isset($record->{$field}) && !empty($record->{$field})) {
+            $record->{$field} = field_encrypt_decrypt($record->{$field});
+          }
         }
+        drupal_write_record($table, $record);
       }
-      drupal_write_record($table, $record);
     }
   }
 
   drupal_set_message(t('%field_name is no longer being encrypted', array('%field_name' => $field_info['field_name'])));
-}
-
-/**
- * Implements hook_field_storage_pre_insert().
- */
-function _field_encrypt_field_storage_pre_insert($entity_type, $entity, &$skip_fields) {
-  _field_encrypt_field_storage_pre_update($entity_type, $entity, $skip_fields);
 }
 
 /**
@@ -223,7 +230,11 @@ function _field_encrypt_field_storage_pre_load($entity_type, $queried_entities, 
 }
 
 /**
- * Encrypt raw message
+ * Encrypt raw message.
+ *
+ * @param $raw
+ *
+ * @return string
  */
 function field_encrypt_encrypt($raw) {
   $encrypted = encrypt($raw, array('base64' => TRUE));
@@ -232,7 +243,11 @@ function field_encrypt_encrypt($raw) {
 }
 
 /**
- * Decrypt encrypted message
+ * Decrypt encrypted message.
+ *
+ * @param $encrypted
+ *
+ * @return mixed|string
  */
 function field_encrypt_decrypt($encrypted) {
   $encrypted = utf8_decode($encrypted);
