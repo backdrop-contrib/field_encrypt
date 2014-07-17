@@ -72,3 +72,61 @@ function field_encrypt_requirements($phase) {
 
   return $requirements;
 }
+
+/**
+ * Update database schema to re-used existing field tables.
+ */
+function field_encrypt_update_7000() {
+  // Column spec for encrypted data.
+  $spec = array(
+    'type'        => 'text',
+    'size'        => 'medium',
+    'description' => 'The encrypted value for this entity field column.',
+  );
+
+  // Get all the current entries.
+  $results = db_select('field_encrypt', 'fe')->fields('fe')->execute()
+    ->fetchAll();
+
+  // Drop the old database table.
+  db_drop_table('field_encrypt');
+
+  if (count($results) > 0) {
+    module_load_include('inc', 'field_encrypt');
+
+    $fields = array();
+    foreach ($results as $result) {
+      if (!isset($fields[$result->field_name])) {
+        $fields[$result->field_name] = field_info_field($result->field_name);
+      }
+      $field_info = $fields[$result->field_name];
+
+      $data  = unserialize(field_encrypt_decrypt($result->value));
+      $table = key($field_info['storage']['details']['sql'][FIELD_LOAD_CURRENT]);
+      foreach ($field_info['storage']['details']['sql'][FIELD_LOAD_CURRENT][$table] as $column => $field) {
+        if (isset($result->{$column}) && isset($data[$field])) {
+          $result->{$column} = $data[$field];
+        }
+      }
+
+      foreach (array(FIELD_LOAD_CURRENT, FIELD_LOAD_REVISION) as $key) {
+        $table = key($field_info['storage']['details']['sql'][$key]);
+
+        // Alter field columns to allow for encrypted data.
+        foreach ($field_info['storage']['details']['sql'][$key][$table] as $column => $field) {
+          if (!isset($field_info['indexes'][$column])) {
+            db_change_field($table, $field, $field, $spec);
+          }
+        }
+
+        // Encrypt and re-insert the data.
+        foreach ($field_info['storage']['details']['sql'][$key][$table] as $column => $field) {
+          if (!isset($field_info['indexes'][$column])) {
+            $result->{$field} = field_encrypt_encrypt($result->{$field});
+          }
+        }
+        drupal_write_record($table, $result);
+      }
+    }
+  }
+}
