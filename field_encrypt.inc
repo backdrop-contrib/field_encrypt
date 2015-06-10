@@ -178,7 +178,12 @@ function _field_encrypt_field_storage_pre_update($entity_type, $entity, &$skip_f
         // Put data in revision table.
         $merge_keys['revision_id'] = $vid;
         unset($fields['revision_id']);
-        db_merge($revision_table)->key($merge_keys)->fields($fields)->execute();
+        if (!empty($fields)) {
+          db_merge($revision_table)
+            ->key($merge_keys)
+            ->fields($fields)
+            ->execute();
+        }
       }
     }
   }
