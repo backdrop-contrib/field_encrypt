@@ -17,7 +17,17 @@ function field_encrypt_enable() {
   // now set up the new class for this bin.
   $old_cache = variable_get('cache_class_cache_field', NULL);
   variable_set('field_encrypt_old_cache', $old_cache);
-  variable_set('cache_class_cache_field', 'FieldEncryptDatabaseCache');
+
+  $default_cache_class = variable_get('cache_default_class', 'DrupalDatabaseCache');
+  switch ($default_cache_class) {
+    case 'DrupalDatabaseCache':
+      variable_set('cache_class_cache_field', 'FieldEncryptDatabaseCache');
+      break;
+
+    case 'MemCacheDrupal':
+      variable_set('cache_class_cache_field', 'FieldEncryptMemCacheDrupal');
+      break;
+  }
 }
 
 /**
