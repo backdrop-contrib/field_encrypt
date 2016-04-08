@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Encryption functionality for the Field encrypt module.
@@ -9,8 +10,10 @@
  *
  * Called when the "Encrypt this field" setting is first applied.
  *
- * @param $field_info
- * @param $has_data
+ * @param array $field_info
+ *   The field definition.
+ * @param bool $has_data
+ *   Whether the field has data.
  */
 function field_encrypt_do_encrypt($field_info, $has_data) {
   // Column spec for encrypted data.
@@ -44,7 +47,7 @@ function field_encrypt_do_encrypt($field_info, $has_data) {
     }
 
     // Encrypt and re-insert the data.
-    if ($has_data) {
+    if ($has_data && isset($data)) {
       foreach ($data as $record) {
         $query = db_insert($table);
         foreach ($field_info['storage']['details']['sql'][$age][$table] as $column => $field) {
@@ -75,8 +78,10 @@ function field_encrypt_do_encrypt($field_info, $has_data) {
  *
  * Called when the "Encrypt this field" setting is disabled.
  *
- * @param $field_info
- * @param $has_data
+ * @param array $field_info
+ *   The field definition.
+ * @param bool $has_data
+ *   Whether the field has data.
  */
 function field_encrypt_un_encrypt($field_info, $has_data) {
   // Prepare field so the storage details are available.
@@ -103,7 +108,7 @@ function field_encrypt_un_encrypt($field_info, $has_data) {
     }
 
     // Decrypt and re-insert the data.
-    if ($has_data) {
+    if ($has_data && isset($data)) {
       foreach ($data as $record) {
         $query = db_insert($table);
         foreach ($field_info['storage']['details']['sql'][$age][$table] as $column => $field) {
@@ -147,11 +152,11 @@ function _field_encrypt_field_storage_pre_update($entity_type, $entity, &$skip_f
     'deleted'  => FALSE,
     'language' => NULL,
   );
-  $instances       = _field_invoke_get_instances($entity_type, $bundle, $default_options);
+  $instances = _field_invoke_get_instances($entity_type, $bundle, $default_options);
 
   foreach ($instances as $instance) {
-    // Get the field data
-    $field_id           = $instance['field_id'];
+    // Get the field data.
+    $field_id = $instance['field_id'];
     $current_field_info = $field_info[$field_id];
 
     // Are we encrypting this field?
@@ -160,8 +165,8 @@ function _field_encrypt_field_storage_pre_update($entity_type, $entity, &$skip_f
       continue;
     }
 
-    $field_name     = $instance['field_name'];
-    $data_table     = key($current_field_info['storage']['details']['sql'][FIELD_LOAD_CURRENT]);
+    $field_name = $instance['field_name'];
+    $data_table = key($current_field_info['storage']['details']['sql'][FIELD_LOAD_CURRENT]);
     $revision_table = key($current_field_info['storage']['details']['sql'][FIELD_LOAD_REVISION]);
 
     // We're bypassing usual storage, mark field for skipping.
@@ -243,11 +248,11 @@ function _field_encrypt_field_storage_pre_load($entity_type, $queried_entities, 
       'deleted'  => FALSE,
       'language' => NULL,
     );
-    $instances       = _field_invoke_get_instances($entity_type, $bundle, $default_options);
+    $instances = _field_invoke_get_instances($entity_type, $bundle, $default_options);
 
     foreach ($instances as $instance) {
-      // Get the field data
-      $field_id           = $instance['field_id'];
+      // Get the field data.
+      $field_id = $instance['field_id'];
       $current_field_info = $field_info[$field_id];
 
       // Are we encrypting this field?
@@ -257,13 +262,13 @@ function _field_encrypt_field_storage_pre_load($entity_type, $queried_entities, 
 
       $field_name = $instance['field_name'];
 
-      // Get the CURRENT or REVISION field table
+      // Get the CURRENT or REVISION field table.
       $table = key($current_field_info['storage']['details']['sql'][$age]);
 
-      // We're bypassing usual storage, mark field for skipping
+      // We're bypassing usual storage, mark field for skipping.
       $skip_fields[$field_id] = $current_field_info;
 
-      // Now we need to fetch the encrypted data
+      // Now we need to fetch the encrypted data.
       $results = db_select($table, 'r')->fields('r')
         ->condition('r.entity_type', $entity_type)
         ->condition('r.entity_id', $id)->condition('r.revision_id', $vid)
@@ -286,9 +291,11 @@ function _field_encrypt_field_storage_pre_load($entity_type, $queried_entities, 
 /**
  * Encrypt raw message.
  *
- * @param $raw
+ * @param string $raw
+ *   The raw message to be encrypted.
  *
  * @return string
+ *   The encrypted data.
  */
 function field_encrypt_encrypt($raw) {
   $encrypted = encrypt($raw, array('base64' => TRUE));
@@ -299,9 +306,11 @@ function field_encrypt_encrypt($raw) {
 /**
  * Decrypt encrypted message.
  *
- * @param $encrypted
+ * @param string $encrypted
+ *   The encrypted data.
  *
  * @return mixed|string
+ *   The raw message.
  */
 function field_encrypt_decrypt($encrypted) {
   $encrypted = utf8_decode($encrypted);

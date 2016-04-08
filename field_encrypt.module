@@ -2,15 +2,7 @@
 
 /**
  * @file
- * Field encrypt - Extension of the Field API to allow encryption of fields.
- *
- * This module allows fields that already exist to be encrypted however once a field
- * table has data any changes to the table structure are forbidden. So encrypted values
- * are held in separate table rather than the original table (which would have been more
- * efficient).
- *
- * @TODO
- *   a. Use Batch API for switching encryption on and off, and changing phrase.
+ * Core functions for the Field Encryption module.
  */
 
 /**
@@ -27,7 +19,7 @@ function field_encrypt_permission() {
 }
 
 /**
- * Implements hook_form_alter().
+ * Implements hook_form_FORM_ID_alter().
  */
 function field_encrypt_form_system_performance_settings_alter(&$form, &$form_state) {
   $form['field_encrypt'] = array(
@@ -55,7 +47,7 @@ function field_encrypt_form_field_ui_field_edit_form_alter(&$form, &$form_state,
   $field_name = $form['#field']['field_name'];
 
   // Try to obtain information about this field.
-  $field_info      = field_info_field($field_name);
+  $field_info = field_info_field($field_name);
   $field_type_info = field_info_field_types($field_info['type']);
 
   // Check that there are encryptable columns on this field as Indexes can not
@@ -89,11 +81,11 @@ function field_encrypt_form_field_ui_field_edit_form_alter(&$form, &$form_state,
     '#weight'      => -2,
   );
 
-  // Hide the option from non-privileged users,
-  // but ensure the values carried through
+  // Hide the option from non-privileged users, but ensure the values carried
+  // through.
   if (!user_access('administer text field encryption')) {
-    $field_encrypt                      =& $settings['field_encrypt'];
-    $field_encrypt['encrypt']['#type']  = 'value';
+    $field_encrypt =& $settings['field_encrypt'];
+    $field_encrypt['encrypt']['#type'] = 'value';
     $field_encrypt['encrypt']['#value'] = $field_encrypt['encrypt']['#default_value'];
   }
 }
@@ -101,8 +93,8 @@ function field_encrypt_form_field_ui_field_edit_form_alter(&$form, &$form_state,
 /**
  * Implements hook_form_FORM_ID_alter().
  */
-function field_encrypt_form_system_modules_alter(&$form, &$form_state, $form_id) {
-  // Find all the fields that are currently being encrypted
+function field_encrypt_form_system_modules_alter(&$form, &$form_state) {
+  // Find all the fields that are currently being encrypted.
   $fields = array();
   foreach (field_info_fields() as $field_name => $field_info) {
     if (!isset($field_info['settings']['field_encrypt']['encrypt'])) {
@@ -114,12 +106,12 @@ function field_encrypt_form_system_modules_alter(&$form, &$form_state, $form_id)
     $fields[] = l(check_plain($field_name), 'admin/reports/fields');
   }
 
-  // If there are any encrypted fields, prevent the module from being disabled
+  // If there are any encrypted fields, prevent the module from being disabled.
   if (!empty($fields)) {
     $field_list = theme('item_list', array('items' => $fields));
 
     $form['modules']['Fields']['field_encrypt']['enable']['#disabled'] = TRUE;
-    $form['modules']['Fields']['field_encrypt']['#required_by'][]      = t('Encrypted fields: <span class="admin-enabled">!fields</span>.', array('!fields' => $field_list));
+    $form['modules']['Fields']['field_encrypt']['#required_by'][] = t('Encrypted fields: <span class="admin-enabled">!fields</span>.', array('!fields' => $field_list));
   }
 }
 
