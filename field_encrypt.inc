@@ -25,8 +25,8 @@ function field_encrypt_do_encrypt($field_info, $has_data) {
   $cache->flush();
   $field_info = $cache->prepareField($field_info);
 
-  foreach (array(FIELD_LOAD_CURRENT, FIELD_LOAD_REVISION) as $key) {
-    $table = key($field_info['storage']['details']['sql'][$key]);
+  foreach (array(FIELD_LOAD_CURRENT, FIELD_LOAD_REVISION) as $age) {
+    $table = key($field_info['storage']['details']['sql'][$age]);
 
     if ($has_data) {
       // Get all the current entries.
@@ -37,7 +37,7 @@ function field_encrypt_do_encrypt($field_info, $has_data) {
     }
 
     // Alter field columns to allow for encrypted data.
-    foreach ($field_info['storage']['details']['sql'][$key][$table] as $column => $field) {
+    foreach ($field_info['storage']['details']['sql'][$age][$table] as $column => $field) {
       if (!isset($field_info['indexes'][$column])) {
         db_change_field($table, $field, $field, $spec);
       }
@@ -47,7 +47,7 @@ function field_encrypt_do_encrypt($field_info, $has_data) {
     if ($has_data) {
       foreach ($data as $record) {
         $query = db_insert($table);
-        foreach ($field_info['storage']['details']['sql'][$key][$table] as $column => $field) {
+        foreach ($field_info['storage']['details']['sql'][$age][$table] as $column => $field) {
           // Don't re-write empty, NULL values.
           if (empty($record->{$field})) {
             unset($record->{$field});
@@ -84,8 +84,8 @@ function field_encrypt_un_encrypt($field_info, $has_data) {
   $cache->flush();
   $field_info = $cache->prepareField($field_info);
 
-  foreach (array(FIELD_LOAD_CURRENT, FIELD_LOAD_REVISION) as $key) {
-    $table = key($field_info['storage']['details']['sql'][$key]);
+  foreach (array(FIELD_LOAD_CURRENT, FIELD_LOAD_REVISION) as $age) {
+    $table = key($field_info['storage']['details']['sql'][$age]);
 
     if ($has_data) {
       // Get all the current entries.
@@ -96,7 +96,7 @@ function field_encrypt_un_encrypt($field_info, $has_data) {
     }
 
     // Revert the field columns back to their original state.
-    foreach ($field_info['storage']['details']['sql'][$key][$table] as $column => $field) {
+    foreach ($field_info['storage']['details']['sql'][$age][$table] as $column => $field) {
       if (!isset($field_info['indexes'][$column])) {
         db_change_field($table, $field, $field, $field_info['columns'][$column]);
       }
@@ -106,7 +106,7 @@ function field_encrypt_un_encrypt($field_info, $has_data) {
     if ($has_data) {
       foreach ($data as $record) {
         $query = db_insert($table);
-        foreach ($field_info['storage']['details']['sql'][$key][$table] as $column => $field) {
+        foreach ($field_info['storage']['details']['sql'][$age][$table] as $column => $field) {
           // Don't re-write empty or NULL values.
           if (empty($record->{$field})) {
             unset($record->{$field});
@@ -175,6 +175,19 @@ function _field_encrypt_field_storage_pre_update($entity_type, $entity, &$skip_f
     // Now we need to insert the data, we can't do multiple merges so we have to
     // do each language/delta separately.
     foreach ($entity->{$field_name} as $language => $items) {
+      // Delete and Insert, like field_sql_storage_field_storage_write() does.
+      db_delete($data_table)
+        ->condition('entity_id', $id)
+        ->condition('entity_type', $entity_type)
+        ->condition('revision_id', $vid)
+        ->execute();
+
+      db_delete($revision_table)
+        ->condition('entity_id', $id)
+        ->condition('entity_type', $entity_type)
+        ->condition('revision_id', $vid)
+        ->execute();
+
       foreach ($items as $delta => $item) {
         $merge_keys = array(
           'entity_type' => $entity_type,
@@ -243,7 +256,9 @@ function _field_encrypt_field_storage_pre_load($entity_type, $queried_entities, 
       }
 
       $field_name = $instance['field_name'];
-      $table      = key($current_field_info['storage']['details']['sql'][FIELD_LOAD_REVISION]);
+
+      // Get the CURRENT or REVISION field table
+      $table = key($current_field_info['storage']['details']['sql'][$age]);
 
       // We're bypassing usual storage, mark field for skipping
       $skip_fields[$field_id] = $current_field_info;
@@ -257,7 +272,7 @@ function _field_encrypt_field_storage_pre_load($entity_type, $queried_entities, 
 
       $field_data = array();
       foreach ($results as $result) {
-        foreach ($current_field_info['storage']['details']['sql'][FIELD_LOAD_REVISION][$table] as $column => $field) {
+        foreach ($current_field_info['storage']['details']['sql'][$age][$table] as $column => $field) {
           if (isset($result->{$field}) && !empty($result->{$field})) {
             $field_data[$result->language][$result->delta][$column] = !isset($current_field_info['indexes'][$column]) ? field_encrypt_decrypt($result->{$field}) : $result->{$field};
           }
