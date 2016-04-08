@@ -46,12 +46,23 @@ function field_encrypt_do_encrypt($field_info, $has_data) {
     // Encrypt and re-insert the data.
     if ($has_data) {
       foreach ($data as $record) {
+        $query = db_insert($table);
         foreach ($field_info['storage']['details']['sql'][$key][$table] as $column => $field) {
-          if (!isset($field_info['indexes'][$column])) {
+          // Don't re-write empty, NULL values.
+          if (empty($record->{$field})) {
+            unset($record->{$field});
+          }
+
+          // Don't encrypt indexes.
+          if (isset($field_info['indexes'][$column])) {
+            continue;
+          }
+
+          if (isset($record->{$field})) {
             $record->{$field} = field_encrypt_encrypt($record->{$field});
           }
         }
-        drupal_write_record($table, $record);
+        $query->fields((array) $record)->execute();
       }
     }
   }
@@ -94,12 +105,23 @@ function field_encrypt_un_encrypt($field_info, $has_data) {
     // Decrypt and re-insert the data.
     if ($has_data) {
       foreach ($data as $record) {
+        $query = db_insert($table);
         foreach ($field_info['storage']['details']['sql'][$key][$table] as $column => $field) {
-          if (isset($record->{$field}) && !empty($record->{$field}) && !isset($field_info['indexes'][$column])) {
+          // Don't re-write empty or NULL values.
+          if (empty($record->{$field})) {
+            unset($record->{$field});
+          }
+
+          // Don't un-encrypt indexes.
+          if (isset($field_info['indexes'][$column])) {
+            continue;
+          }
+
+          if (isset($record->{$field})) {
             $record->{$field} = field_encrypt_decrypt($record->{$field});
           }
         }
-        drupal_write_record($table, $record);
+        $query->fields((array) $record)->execute();
       }
     }
   }
