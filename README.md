@@ -19,6 +19,9 @@ To enable Memcache support for the Field Encryption module you have to ensure
 that the Memcache Field Encryption Cache backend is enabled. This can be set via
 Drupal's Performance settings form.
 
+**Note:** Memcache support requires the [Memcache
+module](https://www.drupal.org/project/memcache) is installed and configured.
+
 
 
 Credits

@@ -111,46 +111,48 @@ class FieldEncryptDatabaseCache extends DrupalDatabaseCache {
 
 }
 
-/**
- * Class FieldEncryptMemCacheDrupal.
- */
-class FieldEncryptMemCacheDrupal extends MemCacheDrupal {
-
-  use FieldEncyptCacheTrait;
-
+if (class_exists('MemCacheDrupal')) {
   /**
-   * {@inheritdoc}
+   * Class FieldEncryptMemCacheDrupal.
    */
-  public function get($cid) {
-    if ($cache = parent::get($cid)) {
-      $cache->data = $this->decrypt($cache->data);
-      $cache->data = unserialize($cache->data);
-      return $cache;
-    }
-    return FALSE;
-  }
+  class FieldEncryptMemCacheDrupal extends MemCacheDrupal {
 
-  /**
-   * {@inheritdoc}
-   */
-  public function getMultiple(&$cids) {
-    $results = parent::getMultiple($cids);
+    use FieldEncyptCacheTrait;
 
-    foreach ($results as &$result) {
-      $result->data = $this->decrypt($result->data);
-      $result->data = unserialize($result->data);
+    /**
+     * {@inheritdoc}
+     */
+    public function get($cid) {
+      if ($cache = parent::get($cid)) {
+        $cache->data = $this->decrypt($cache->data);
+        $cache->data = unserialize($cache->data);
+        return $cache;
+      }
+      return FALSE;
     }
 
-    return $results;
+    /**
+     * {@inheritdoc}
+     */
+    public function getMultiple(&$cids) {
+      $results = parent::getMultiple($cids);
+
+      foreach ($results as &$result) {
+        $result->data = $this->decrypt($result->data);
+        $result->data = unserialize($result->data);
+      }
+
+      return $results;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function set($cid, $data, $expire = CACHE_PERMANENT) {
+      $data = $this->encrypt($data);
+
+      parent::set($cid, $data, $expire);
+    }
+
   }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function set($cid, $data, $expire = CACHE_PERMANENT) {
-    $data = $this->encrypt($data);
-
-    parent::set($cid, $data, $expire);
-  }
-
 }

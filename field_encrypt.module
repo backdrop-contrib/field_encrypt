@@ -22,20 +22,35 @@ function field_encrypt_permission() {
  * Implements hook_form_FORM_ID_alter().
  */
 function field_encrypt_form_system_performance_settings_alter(&$form, &$form_state) {
-  $form['field_encrypt'] = array(
-    '#type'  => 'fieldset',
-    '#title' => t('Field Encryption'),
-  );
+  if (module_exists('memcache')) {
+    $form['field_encrypt'] = array(
+      '#type'  => 'fieldset',
+      '#title' => t('Field Encryption'),
+    );
 
-  $form['field_encrypt']['cache_class_cache_field'] = array(
-    '#title'         => t('Cache backend'),
-    '#type'          => 'select',
-    '#options'       => array(
-      'FieldEncryptDatabaseCache'  => t('Drupal database'),
-      'FieldEncryptMemCacheDrupal' => t('Memcache'),
-    ),
-    '#default_value' => variable_get('cache_class_cache_field', 'FieldEncryptDatabaseCache'),
-  );
+    $form['field_encrypt']['cache_class_cache_field'] = array(
+      '#title'         => t('Cache backend'),
+      '#type'          => 'select',
+      '#options'       => array(
+        'FieldEncryptDatabaseCache'  => t('Drupal database'),
+        'FieldEncryptMemCacheDrupal' => t('Memcache'),
+      ),
+      '#default_value' => variable_get('cache_class_cache_field', 'FieldEncryptDatabaseCache'),
+    );
+  }
+}
+
+/**
+ * Implements hook_modules_disabled().
+ */
+function field_encrypt_modules_disabled($modules) {
+  if (in_array('memcache', $modules) && variable_get('cache_class_cache_field', NULL) == 'FieldEncryptMemCacheDrupal') {
+    // Clear the cache of existing data.
+    cache_clear_all('*', 'cache_field', TRUE);
+
+    // Set up the new class for this bin.
+    variable_set('cache_class_cache_field', 'FieldEncryptDatabaseCache');
+  }
 }
 
 /**
