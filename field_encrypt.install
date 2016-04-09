@@ -45,38 +45,6 @@ function field_encrypt_disable() {
 }
 
 /**
- * Implements hook_requirements().
- */
-function field_encrypt_requirements($phase) {
-  $requirements = array();
-  // Ensure translations don't break at install time.
-  $t = get_t();
-
-  switch ($phase) {
-    case 'install':
-    case 'update':
-      $requirements['encryption'] = array(
-        'title' => $t('Encryption library'),
-      );
-
-      $encrypt_ok = extension_loaded('mcrypt');
-      if (!$encrypt_ok) {
-        $message = $t('Your version of PHP does not have the mcrypt extension, this module requires that library to function.');
-
-        $requirements['encryption']['value'] = $t('unavailable');
-        $requirements['encryption']['severity'] = REQUIREMENT_ERROR;
-        $requirements['encryption']['description'] = $message;
-      }
-      else {
-        $requirements['encryption']['value'] = $t('installed');
-      }
-      break;
-  }
-
-  return $requirements;
-}
-
-/**
  * Update database schema to re-used existing field tables.
  */
 function field_encrypt_update_7000() {
