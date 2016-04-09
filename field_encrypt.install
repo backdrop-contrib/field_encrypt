@@ -80,13 +80,6 @@ function field_encrypt_requirements($phase) {
  * Update database schema to re-used existing field tables.
  */
 function field_encrypt_update_7000() {
-  // Column spec for encrypted data.
-  $spec = array(
-    'type'        => 'text',
-    'size'        => 'medium',
-    'description' => 'The encrypted value for this entity field column.',
-  );
-
   // Get all the current entries.
   $results = db_select('field_encrypt', 'fe')->fields('fe')->execute()
     ->fetchAll();
@@ -106,30 +99,28 @@ function field_encrypt_update_7000() {
 
       $data = unserialize(field_encrypt_decrypt($result->value));
       $table = key($field_info['storage']['details']['sql'][FIELD_LOAD_CURRENT]);
-      foreach ($field_info['storage']['details']['sql'][FIELD_LOAD_CURRENT][$table] as $column => $field) {
-        if (isset($result->{$column}) && isset($data[$field])) {
-          $result->{$column} = $data[$field];
+      unset($result->value);
+      foreach ($field_info['storage']['details']['sql'][FIELD_LOAD_CURRENT][$table] as $field) {
+        if (isset($data[$field])) {
+          $result->{$field} = $data[$field];
         }
       }
 
       foreach (array(FIELD_LOAD_CURRENT, FIELD_LOAD_REVISION) as $key) {
         $table = key($field_info['storage']['details']['sql'][$key]);
 
-        // Alter field columns to allow for encrypted data.
-        foreach ($field_info['storage']['details']['sql'][$key][$table] as $column => $field) {
-          if (!isset($field_info['indexes'][$column])) {
-            db_change_field($table, $field, $field, $spec);
-          }
-        }
-
-        // Encrypt and re-insert the data.
-        foreach ($field_info['storage']['details']['sql'][$key][$table] as $column => $field) {
-          if (!isset($field_info['indexes'][$column])) {
-            $result->{$field} = field_encrypt_encrypt($result->{$field});
-          }
-        }
         drupal_write_record($table, $result);
       }
+    }
+  }
+
+  $fields = field_info_fields();
+  foreach ($fields as $field_info) {
+    if (isset($field_info['settings']['field_encrypt']['encrypt']) && $field_info['settings']['field_encrypt']['encrypt']) {
+      module_load_include('inc', 'field_encrypt');
+
+      $has_data = field_has_data($field_info['field_name']);
+      field_encrypt_do_encrypt($field_info, $has_data);
     }
   }
 }
