@@ -81,7 +81,13 @@ class FieldEncryptDatabaseCache extends DrupalDatabaseCache {
       return FALSE;
     }
 
-    $cache->data = $this->decrypt($cache->data);
+    try {
+      $cache->data = $this->decrypt($cache->data);
+    }
+    catch (Exception $e) {
+      watchdog_exception('field_encrypt', $e);
+      return FALSE;
+    }
     if ($cache->serialized) {
       $cache->data = unserialize($cache->data);
     }
@@ -93,11 +99,18 @@ class FieldEncryptDatabaseCache extends DrupalDatabaseCache {
    * {@inheritdoc}
    */
   public function set($cid, $data, $expire = CACHE_PERMANENT) {
+    try {
+      $encrypted_data = $this->encrypt($data);
+    }
+    catch (Exception $e) {
+      watchdog_exception('field_encrypt', $e);
+      return;
+    }
     $fields = array(
       'serialized' => !is_string($data),
       'created'    => REQUEST_TIME,
       'expire'     => $expire,
-      'data'       => $this->encrypt($data),
+      'data'       => $encrypted_data,
     );
 
     try {
@@ -124,7 +137,13 @@ if (class_exists('MemCacheDrupal')) {
      */
     public function get($cid) {
       if ($cache = parent::get($cid)) {
-        $cache->data = $this->decrypt($cache->data);
+        try {
+          $cache->data = $this->decrypt($cache->data);
+        }
+        catch (Exception $e) {
+          watchdog_exception('field_encrypt', $e);
+          return FALSE;
+        }
         $cache->data = unserialize($cache->data);
         return $cache;
       }
@@ -137,8 +156,15 @@ if (class_exists('MemCacheDrupal')) {
     public function getMultiple(&$cids) {
       $results = parent::getMultiple($cids);
 
-      foreach ($results as &$result) {
-        $result->data = $this->decrypt($result->data);
+      foreach ($results as $cid => $result) {
+        try {
+          $result->data = $this->decrypt($result->data);
+        }
+        catch (Exception $e) {
+          watchdog_exception('field_encrypt', $e);
+          unset($results[$cid]);
+          continue;
+        }
         $result->data = unserialize($result->data);
       }
 
@@ -149,9 +175,15 @@ if (class_exists('MemCacheDrupal')) {
      * {@inheritdoc}
      */
     public function set($cid, $data, $expire = CACHE_PERMANENT) {
-      $data = $this->encrypt($data);
+      try {
+        $encrypted_data = $this->encrypt($data);
+      }
+      catch (Exception $e) {
+        watchdog_exception('field_encrypt', $e);
+        return;
+      }
 
-      parent::set($cid, $data, $expire);
+      parent::set($cid, $encrypted_data, $expire);
     }
 
   }

@@ -298,7 +298,12 @@ function _field_encrypt_field_storage_pre_load($entity_type, $queried_entities, 
  *   The encrypted data.
  */
 function field_encrypt_encrypt($raw) {
-  $encrypted = encrypt($raw, array('base64' => TRUE));
+  try{
+		$encrypted = encrypt($raw, array('base64' => TRUE));
+	}
+	catch (Exception $e) {
+		return null;
+	}
 
   return utf8_encode($encrypted);
 }
@@ -314,7 +319,12 @@ function field_encrypt_encrypt($raw) {
  */
 function field_encrypt_decrypt($encrypted) {
   $encrypted = utf8_decode($encrypted);
-  $decrypted = decrypt($encrypted, array('base64' => TRUE));
+  try{
+	  $decrypted = decrypt($encrypted, array('base64' => TRUE));
+  }
+  catch (Exception $e) {
+	  return null;
+  }
 
   return $decrypted;
 }
