@@ -48,7 +48,7 @@ trait FieldEncyptCacheTrait {
 /**
  * Class FieldEncryptDatabaseCache.
  */
-class FieldEncryptDatabaseCache extends DrupalDatabaseCache {
+class FieldEncryptDatabaseCache extends BackdropDatabaseCache {
 
   use FieldEncyptCacheTrait;
 
@@ -74,9 +74,9 @@ class FieldEncryptDatabaseCache extends DrupalDatabaseCache {
     // currently valid for this user before we return it by making sure the
     // cache entry was created before the timestamp in the current session's
     // cache timer. The cache variable is loaded into the $user object by
-    // _drupal_session_read() in session.inc. If the data is permanent or we're
+    // _backdrop_session_read() in session.inc. If the data is permanent or we're
     // not enforcing a minimum cache lifetime always return the cached data.
-    if ($cache->expire != CACHE_PERMANENT && variable_get('cache_lifetime', 0) && $user->cache > $cache->created) {
+    if ($cache->expire != CACHE_PERMANENT && config_get('system.core', 'page_cache_maximum_age') && $user->cache > $cache->created) {
       // This cache data is too old and thus not valid for us, ignore it.
       return FALSE;
     }
@@ -124,11 +124,11 @@ class FieldEncryptDatabaseCache extends DrupalDatabaseCache {
 
 }
 
-if (class_exists('MemCacheDrupal')) {
+if (class_exists('MemCacheBackdrop')) {
   /**
-   * Class FieldEncryptMemCacheDrupal.
+   * Class FieldEncryptMemCacheBackdrop.
    */
-  class FieldEncryptMemCacheDrupal extends MemCacheDrupal {
+  class FieldEncryptMemCacheBackdrop extends MemCacheBackdrop {
 
     use FieldEncyptCacheTrait;
 

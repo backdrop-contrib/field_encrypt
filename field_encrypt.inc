@@ -18,15 +18,10 @@
 function field_encrypt_do_encrypt($field_info, $has_data) {
   // Column spec for encrypted data.
   $spec = array(
-    'type'        => 'text',
-    'size'        => 'medium',
+    'type' => 'text',
+    'size' => 'medium',
     'description' => 'The encrypted value for this entity field column.',
   );
-
-  // Prepare field so the storage details are available.
-  $cache = _field_info_field_cache();
-  $cache->flush();
-  $field_info = $cache->prepareField($field_info);
 
   foreach (array(FIELD_LOAD_CURRENT, FIELD_LOAD_REVISION) as $age) {
     $table = key($field_info['storage']['details']['sql'][$age]);
@@ -70,7 +65,7 @@ function field_encrypt_do_encrypt($field_info, $has_data) {
     }
   }
 
-  drupal_set_message(t('%field_name is now being encrypted', array('%field_name' => $field_info['field_name'])));
+  backdrop_set_message(t('%field_name is now being encrypted', array('%field_name' => $field_info['field_name'])));
 }
 
 /**
@@ -84,11 +79,6 @@ function field_encrypt_do_encrypt($field_info, $has_data) {
  *   Whether the field has data.
  */
 function field_encrypt_un_encrypt($field_info, $has_data) {
-  // Prepare field so the storage details are available.
-  $cache = _field_info_field_cache();
-  $cache->flush();
-  $field_info = $cache->prepareField($field_info);
-
   foreach (array(FIELD_LOAD_CURRENT, FIELD_LOAD_REVISION) as $age) {
     $table = key($field_info['storage']['details']['sql'][$age]);
 
@@ -131,33 +121,28 @@ function field_encrypt_un_encrypt($field_info, $has_data) {
     }
   }
 
-  drupal_set_message(t('%field_name is no longer being encrypted', array('%field_name' => $field_info['field_name'])));
+  backdrop_set_message(t('%field_name is no longer being encrypted', array('%field_name' => $field_info['field_name'])));
 }
 
 /**
  * Implements hook_field_storage_pre_update().
  */
 function _field_encrypt_field_storage_pre_update($entity_type, $entity, &$skip_fields) {
-  static $field_info = NULL;
-  if ($field_info === NULL) {
-    $field_info = field_info_field_by_ids();
-  }
-
   list($id, $vid, $bundle) = entity_extract_ids($entity_type, $entity);
   if (is_null($vid)) {
     $vid = $id;
   }
   $default_options = array(
-    'default'  => FALSE,
-    'deleted'  => FALSE,
+    'default' => FALSE,
+    'deleted' => FALSE,
     'language' => NULL,
   );
   $instances = _field_invoke_get_instances($entity_type, $bundle, $default_options);
 
   foreach ($instances as $instance) {
     // Get the field data.
-    $field_id = $instance['field_id'];
-    $current_field_info = $field_info[$field_id];
+    $field_name = $instance['field_name'];
+    $current_field_info = field_info_field($field_name);
 
     // Are we encrypting this field?
     if (!isset($current_field_info['settings']['field_encrypt']['encrypt']) || !$current_field_info['settings']['field_encrypt']['encrypt']) {
@@ -170,7 +155,7 @@ function _field_encrypt_field_storage_pre_update($entity_type, $entity, &$skip_f
     $revision_table = key($current_field_info['storage']['details']['sql'][FIELD_LOAD_REVISION]);
 
     // We're bypassing usual storage, mark field for skipping.
-    $skip_fields[$field_id] = $current_field_info;
+    $skip_fields[$field_name] = $current_field_info;
 
     // If there's nothing in the field, go no further.
     if (empty($entity->{$field_name})) {
@@ -196,11 +181,11 @@ function _field_encrypt_field_storage_pre_update($entity_type, $entity, &$skip_f
       foreach ($items as $delta => $item) {
         $merge_keys = array(
           'entity_type' => $entity_type,
-          'bundle'      => $bundle,
-          'deleted'     => 0,
-          'entity_id'   => $id,
-          'language'    => $language,
-          'delta'       => $delta,
+          'bundle' => $bundle,
+          'deleted' => 0,
+          'entity_id' => $id,
+          'language' => $language,
+          'delta' => $delta,
         );
 
         $fields = array(
@@ -208,7 +193,7 @@ function _field_encrypt_field_storage_pre_update($entity_type, $entity, &$skip_f
         );
         foreach ($current_field_info['storage']['details']['sql'][FIELD_LOAD_CURRENT][$data_table] as $column => $field) {
           if (isset($item[$column]) && !empty($item[$column])) {
-            $fields[$field] = !isset($current_field_info['indexes'][$column]) ? field_encrypt_encrypt($item[$column]) : $item[$column];
+            $fields[$field] = !isset($current_field_info['indexes'][$column])?field_encrypt_encrypt($item[$column]) : $item[$column];
           }
         }
 
@@ -233,27 +218,22 @@ function _field_encrypt_field_storage_pre_update($entity_type, $entity, &$skip_f
  * Implements hook_field_storage_pre_load().
  */
 function _field_encrypt_field_storage_pre_load($entity_type, $queried_entities, $age, &$skip_fields, $options) {
-  static $field_info = NULL;
-  if ($field_info === NULL) {
-    $field_info = field_info_field_by_ids();
-  }
-
   foreach ($queried_entities as $entity) {
     list($id, $vid, $bundle) = entity_extract_ids($entity_type, $entity);
     if (is_null($vid)) {
       $vid = $id;
     }
     $default_options = array(
-      'default'  => FALSE,
-      'deleted'  => FALSE,
+      'default' => FALSE,
+      'deleted' => FALSE,
       'language' => NULL,
     );
     $instances = _field_invoke_get_instances($entity_type, $bundle, $default_options);
 
     foreach ($instances as $instance) {
       // Get the field data.
-      $field_id = $instance['field_id'];
-      $current_field_info = $field_info[$field_id];
+      $field_name = $instance['field_name'];
+      $current_field_info = field_info_field($field_name);
 
       // Are we encrypting this field?
       if (!isset($current_field_info['settings']['field_encrypt']['encrypt']) || !$current_field_info['settings']['field_encrypt']['encrypt']) {
@@ -266,7 +246,7 @@ function _field_encrypt_field_storage_pre_load($entity_type, $queried_entities, 
       $table = key($current_field_info['storage']['details']['sql'][$age]);
 
       // We're bypassing usual storage, mark field for skipping.
-      $skip_fields[$field_id] = $current_field_info;
+      $skip_fields[$field_name] = $current_field_info;
 
       // Now we need to fetch the encrypted data.
       $results = db_select($table, 'r')->fields('r')
@@ -279,7 +259,7 @@ function _field_encrypt_field_storage_pre_load($entity_type, $queried_entities, 
       foreach ($results as $result) {
         foreach ($current_field_info['storage']['details']['sql'][$age][$table] as $column => $field) {
           if (isset($result->{$field}) && !empty($result->{$field})) {
-            $field_data[$result->language][$result->delta][$column] = !isset($current_field_info['indexes'][$column]) ? field_encrypt_decrypt($result->{$field}) : $result->{$field};
+            $field_data[$result->language][$result->delta][$column] = !isset($current_field_info['indexes'][$column])?field_encrypt_decrypt($result->{$field}) : $result->{$field};
           }
         }
       }
@@ -298,12 +278,12 @@ function _field_encrypt_field_storage_pre_load($entity_type, $queried_entities, 
  *   The encrypted data.
  */
 function field_encrypt_encrypt($raw) {
-  try{
-		$encrypted = encrypt($raw, array('base64' => TRUE));
-	}
-	catch (Exception $e) {
-		return null;
-	}
+  try {
+    $encrypted = encrypt($raw, array('base64' => TRUE));
+  }
+  catch (Exception $e) {
+    return null;
+  }
 
   return utf8_encode($encrypted);
 }
@@ -319,11 +299,11 @@ function field_encrypt_encrypt($raw) {
  */
 function field_encrypt_decrypt($encrypted) {
   $encrypted = utf8_decode($encrypted);
-  try{
-	  $decrypted = decrypt($encrypted, array('base64' => TRUE));
+  try {
+    $decrypted = decrypt($encrypted, array('base64' => TRUE));
   }
   catch (Exception $e) {
-	  return null;
+    return null;
   }
 
   return $decrypted;
