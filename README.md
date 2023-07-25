@@ -41,7 +41,7 @@ complete text.
 Maintainers
 -----------
 
-* (Herb v/d Dool)[https://github.com/herbdool]
+* [Herb v/d Dool](https://github.com/herbdool)
 
 Credits
 -------
