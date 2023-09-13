@@ -24,6 +24,9 @@ function field_encrypt_do_encrypt($field_info, $has_data) {
   );
 
   foreach (array(FIELD_LOAD_CURRENT, FIELD_LOAD_REVISION) as $age) {
+    if (!isset($field_info['storage']['details']['sql'][$age]) || !is_array($field_info['storage']['details']['sql'][$age])) {
+      continue;
+    }
     $table = key($field_info['storage']['details']['sql'][$age]);
 
     if ($has_data) {
