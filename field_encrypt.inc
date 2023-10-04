@@ -288,7 +288,7 @@ function field_encrypt_encrypt($raw) {
     return null;
   }
 
-  return utf8_encode($encrypted);
+  return mb_convert_encoding($encrypted, 'UTF-8', 'ISO-8859-1');
 }
 
 /**
@@ -301,7 +301,7 @@ function field_encrypt_encrypt($raw) {
  *   The raw message.
  */
 function field_encrypt_decrypt($encrypted) {
-  $encrypted = utf8_decode($encrypted);
+  $encrypted = mb_convert_encoding($encrypted, 'ISO-8859-1', 'UTF-8');
   try {
     $decrypted = decrypt($encrypted, array('base64' => TRUE));
   }
