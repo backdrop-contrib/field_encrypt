@@ -63,3 +63,215 @@ function field_encrypt_requirements($phase) {
 function field_encrypt_update_last_removed() {
   return 7000;
 }
+
+/**
+ * Clone Data and re-used existing field tables.
+ */
+function field_encrypt_update_1000(&$sandbox) {
+  // If using an old beta release in Drupal 7, it may not warn that a newer
+  // codebase is required before migrating to Backdrop. So attempt to convert
+  // old field_encrypt table again.
+  if (!db_table_exists('field_encrypt')) {
+    return;
+  }
+
+  // If this is the first pass through this update function then set some
+  // variables.
+  if (!isset($sandbox['total'])) {
+    $result = db_select('field_encrypt', 'fe')->fields('fe')->execute();
+    $sandbox['total'] = $result->rowCount();
+    $sandbox['current'] = 0;
+  }
+
+  // How many nodes should be processed per pass. The higher this number is, the
+  // faster your update will complete, but the more likely your server will run
+  // out of memory or timeout.
+  $items_per_pass = 2000;
+
+  $results = db_select('field_encrypt', 'fe')->fields('fe')->range($sandbox['current'], $items_per_pass)->execute()->FetchAll();
+
+   if (count($results) > 0) {
+     module_load_include('inc', 'field_encrypt', 'field_encrypt');
+
+     $fields = array();
+    foreach ($results as $result) {
+      if (!isset($fields[$result->field_name])) {
+        $fields[$result->field_name] = field_info_field($result->field_name);
+      }
+      $field_info = $fields[$result->field_name];
+
+      $data = (array) unserialize(field_encrypt_decrypt($result->value));
+
+      $table = key($field_info['storage']['details']['sql'][FIELD_LOAD_CURRENT]);
+      unset($result->value);
+      foreach ($field_info['storage']['details']['sql'][FIELD_LOAD_CURRENT][$table] as $field) {
+        if (isset($data[$field])) {
+          $result->{$field} = $data[$field];
+         }
+       }
+
+      $entity = entity_load($result->entity_type, array($result->entity_id));
+
+      $entity = reset($entity);
+
+      if (empty($entity)) {
+        // If the entity was deleted but didn't update field_encrypt.
+        $sandbox['current']++;
+        continue;
+      }
+
+      list($id, $vid, $bundle) = entity_extract_ids($result->entity_type, $entity);
+
+      if ($vid == $result->revision_id) {
+        $update_table = array(FIELD_LOAD_CURRENT, FIELD_LOAD_REVISION);
+      }
+      else {
+        $update_table = array(FIELD_LOAD_REVISION);
+      }
+      foreach ($update_table as $key) {
+         $table = key($field_info['storage']['details']['sql'][$key]);
+
+         backdrop_write_record($table, $result);
+       }
+      $sandbox['current']++;
+    }
+  }
+
+  $sandbox['#finished'] = ($sandbox['current'] / $sandbox['total']);
+
+  echo "Finished " . $sandbox['current'] . "  out of " . $sandbox['total'] . PHP_EOL;
+
+}
+
+/**
+ * Encrypt cloned data in existing field tables.
+ */
+function field_encrypt_update_1001(&$sandbox) {
+  if (!db_table_exists('field_encrypt')) {
+    return;
+  }
+
+  $items_per_pass = 2000;
+  $sandbox['#finished'] = 0;
+
+  // Loads the initial list of encrypted fields
+  if (!isset($sandbox['fields_to_batch'])) {
+    $sandbox['fields_to_batch'] = array();
+    foreach (field_info_fields() as $field_info) {
+      if (isset($field_info['settings']['field_encrypt']['encrypt']) && $field_info['settings']['field_encrypt']['encrypt']) {
+        foreach (array(FIELD_LOAD_CURRENT, FIELD_LOAD_REVISION) as $age) {
+          $table = key($field_info['storage']['details']['sql'][$age]);
+
+          if (field_has_data($field_info['field_name'])) {
+            $data = db_select($table, 't')->fields('t')->execute();
+
+            $field = array();
+            $field['table_name'] = $table;
+            $field['field_name'] = $field_info['field_name'];
+            $field['field_info'] = $field_info;
+            $field['field_age'] = $age;
+            $field['row_count'] = $data->rowCount();
+            $field['current_count'] = 0;
+
+            array_push($sandbox['fields_to_batch'], $field);
+          }
+        }
+      }
+    }
+    if ($sandbox['fields_to_batch']) {
+      $sandbox['current_field'] = array_pop($sandbox['fields_to_batch']);
+    }
+  }
+
+  if (isset($sandbox['current_field'])) {
+    if ($sandbox['current_field']['current_count'] == 0) {
+      db_add_field($sandbox['current_field']['table_name'], $sandbox['current_field']['field_name'] . '_temp', array(
+        'type' => 'text',
+        'size' => 'medium',
+        'description' => 'The encrypted value for this entity field column.',
+      ));
+
+    }
+
+    $data = db_select($sandbox['current_field']['table_name'], 't')
+      ->fields('t')
+      ->range($sandbox['current_field']['current_count'], $items_per_pass)
+      ->execute()
+      ->fetchAll();
+
+    // Encrypt and re-insert the data.
+    module_load_include('inc', 'field_encrypt', 'field_encrypt');
+    if (isset($data)) {
+      foreach ($data as $record) {
+
+        // Is there a better way of doing this besides conditions?
+        $query = db_update($sandbox['current_field']['table_name'])
+          ->condition('entity_id', $record->entity_id, '=')
+          ->condition('revision_id', $record->revision_id, '=')
+          ->condition('delta', $record->delta, '=')
+          ->fields(array(
+        $sandbox['current_field']['field_name'] . '_temp' => field_encrypt_encrypt($record->{$sandbox['current_field']['field_name'] . '_value'}),
+          ))->execute();
+        $sandbox['current_field']['current_count']++;
+      }
+    }
+    echo "Field: " . $sandbox['current_field']['field_name'] . " Finished: " . $sandbox['current_field']['current_count'] . "  out of " . $sandbox['current_field']['row_count'] . PHP_EOL;
+    if ($sandbox['current_field']['row_count'] == $sandbox['current_field']['current_count']) {
+
+      if (empty($sandbox['fields_to_batch'])) {
+        $sandbox['#finished'] = 1;
+      }
+      else {
+        array_pop($sandbox['current_field']);
+        $sandbox['current_field'] = array_pop($sandbox['fields_to_batch']);
+      }
+     }
+   }
+}
+
+/**
+ * Drop all the encrypt fields with a wrong structure and rename the temp field created earlier.
+ */
+function field_encrypt_update_1002(&$sandbox) {
+  if (!db_table_exists('field_encrypt')) {
+    return;
+  }
+
+  foreach (field_info_fields() as $field_info) {
+     if (isset($field_info['settings']['field_encrypt']['encrypt']) && $field_info['settings']['field_encrypt']['encrypt']) {
+      foreach (array(FIELD_LOAD_CURRENT, FIELD_LOAD_REVISION) as $age) {
+        if (db_field_exists(key($field_info['storage']['details']['sql'][$age]), $field_info['field_name'] . '_temp')) {
+
+          db_drop_field(key($field_info['storage']['details']['sql'][$age]), $field_info['field_name'] . '_value');
+
+          db_change_field(key($field_info['storage']['details']['sql'][$age]), $field_info['field_name'] . '_temp', $field_info['field_name'] . '_value', array(
+          'type' => 'text',
+          'size' => 'medium',
+          'description' => 'The encrypted value for this entity field column.',
+          ));
+
+        }
+        else {
+          db_change_field(key($field_info['storage']['details']['sql'][$age]), $field_info['field_name'] . '_value', $field_info['field_name'] . '_value', array(
+          'type' => 'text',
+          'size' => 'medium',
+          'description' => 'The encrypted value for this entity field column.',
+          ));
+
+        }
+      }
+     }
+   }
+ }
+
+/**
+ * Drop old field_encrypt table
+ */
+function field_encrypt_update_1003() {
+  if (!db_table_exists('field_encrypt')) {
+    return;
+  }
+
+  // Drop the old database table.
+  db_drop_table('field_encrypt');
+}
