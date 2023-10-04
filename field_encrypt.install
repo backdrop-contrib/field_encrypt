@@ -29,6 +29,11 @@ function field_encrypt_requirements($phase) {
 
   $requirements = array();
 
+  // Make sure schema version is appropriate.
+  if (backdrop_get_installed_schema_version('field_encrypt') == 6999) {
+    backdrop_set_installed_schema_version('field_encrypt', 999);
+  }
+
   $cache_class_cache_field = settings_get('cache_class_cache_field', NULL);
 
   $requirements['field_encrypt_cache_class'] = array(
