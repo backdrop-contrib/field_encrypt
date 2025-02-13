@@ -188,3 +188,66 @@ if (class_exists('MemCacheBackdrop')) {
 
   }
 }
+
+if (class_exists('FilecacheBaseCache')) {
+  /**
+   * Class FieldEncryptFilecacheCache.
+   */
+  class FieldEncryptFilecacheCache extends FilecacheCache {
+
+    use FieldEncyptCacheTrait;
+
+    /**
+     * {@inheritdoc}
+     */
+    public function get($cid) {
+      if ($cache = parent::get($cid)) {
+        try {
+          $cache->data = $this->decrypt($cache->data);
+        }
+        catch (Exception $e) {
+          watchdog_exception('field_encrypt', $e);
+          return FALSE;
+        }
+        return $cache;
+      }
+      return FALSE;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getMultiple(&$cids) {
+      $results = parent::getMultiple($cids);
+
+      foreach ($results as $cid => $result) {
+        try {
+          $result->data = $this->decrypt($result->data);
+        }
+        catch (Exception $e) {
+          watchdog_exception('field_encrypt', $e);
+          unset($results[$cid]);
+          continue;
+        }
+      }
+
+      return $results;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function set($cid, $data, $expire = CACHE_PERMANENT) {
+      try {
+        $encrypted_data = $this->encrypt($data);
+      }
+      catch (Exception $e) {
+        watchdog_exception('field_encrypt', $e);
+        return;
+      }
+
+      parent::set($cid, $encrypted_data, $expire);
+    }
+
+  }
+}
