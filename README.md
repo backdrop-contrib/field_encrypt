@@ -32,6 +32,20 @@ This can be set in `settings.php` file by adding
 **Note:** Memcache support requires the [Memcache
 module](https://backdropcms.org/project/memcache) is installed and configured.
 
+Filecache support
+----------------
+
+To enable Filecache support for the Field Encryption module you have to ensure
+that the Filecache Field Encryption Cache backend is enabled.
+
+This can be set in `settings.php` file by adding
+`$settings['cache_class_cache_field'] = 'FieldEncryptFilecacheCache';`.
+
+**Note:** Filecache support requires the [Filecache
+module](https://backdropcms.org/project/filecache) is installed and configured.
+It will only support the `FilecacheCache` class and not the experimental `FilecachePhpCache`
+class.
+
 License
 -------
 

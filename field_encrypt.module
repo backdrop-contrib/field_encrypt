@@ -24,7 +24,12 @@ function field_encrypt_permission() {
 function field_encrypt_modules_disabled($modules) {
   if (in_array('memcache', $modules) && settings_get('cache_class_cache_field', NULL) == 'FieldEncryptMemCacheBackdrop') {
     // Clear the cache of existing data.
-    cache_clear_all('*', 'cache_field', TRUE);
+    cache_flush('cache_field');
+  }
+
+  if (in_array('filecache', $modules) && settings_get('cache_class_cache_field', NULL) == 'FieldEncryptFilecacheCache') {
+    // Clear the cache of existing data.
+    cache_flush('cache_field');
   }
 }
 

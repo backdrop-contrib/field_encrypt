@@ -59,6 +59,17 @@ function field_encrypt_requirements($phase) {
     }
   }
 
+  if (module_exists('filecache')) {
+    if ($cache_class_cache_field != 'FieldEncryptFilecacheCache') {
+      $requirements['field_encrypt_cache_class']['description'] = $t('FieldEncryptFilecacheCache needs to be set as the field cache class by adding <code>$settings[\'cache_class_cache_field\'] = \'FieldEncryptFilecacheCache\';</code> in settings.php.');
+      $requirements['field_encrypt_cache_class']['severity'] = REQUIREMENT_ERROR;
+    }
+    else {
+      $requirements['field_encrypt_cache_class']['description'] = $t('FieldEncryptFilecacheCache is set as the field cache class.');
+      $requirements['field_encrypt_cache_class']['severity'] = REQUIREMENT_OK;
+    }
+  }
+
   return $requirements;
 }
 
