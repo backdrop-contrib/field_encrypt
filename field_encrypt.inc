@@ -16,6 +16,12 @@
  *   Whether the field has data.
  */
 function field_encrypt_do_encrypt($field_info, $has_data) {
+  // If storage details are missing (common during config import),
+  // reload the field using the Field Info API to populate them.
+  if (!isset($field_info['storage']['details'])) {
+    $field_info = field_info_field($field_info['field_name']);
+  }
+
   // Column spec for encrypted data.
   $spec = array(
     'type' => 'text',
@@ -82,6 +88,12 @@ function field_encrypt_do_encrypt($field_info, $has_data) {
  *   Whether the field has data.
  */
 function field_encrypt_un_encrypt($field_info, $has_data) {
+  // If storage details are missing (common during config import),
+  // reload the field using the Field Info API to populate them.
+  if (!isset($field_info['storage']['details'])) {
+    $field_info = field_info_field($field_info['field_name']);
+  }
+
   foreach (array(FIELD_LOAD_CURRENT, FIELD_LOAD_REVISION) as $age) {
     $table = key($field_info['storage']['details']['sql'][$age]);
 
